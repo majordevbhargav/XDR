@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cisco XDR Automation and APIs: Reference</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#202428;--mut:#646b73;--ac:#00629b;--ac2:#b4540a;--card:#fff;--ln:#dcdad3;--code:#f0eee8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181b;--fg:#e6e8ea;--mut:#9aa1a8;--ac:#5cb8ee;--ac2:#f0a063;--card:#1d2125;--ln:#33393f;--code:#262b30}}
+:root[data-theme="dark"]{--bg:#15181b;--fg:#e6e8ea;--mut:#9aa1a8;--ac:#5cb8ee;--ac2:#f0a063;--card:#1d2125;--ln:#33393f;--code:#262b30}
+html{scroll-padding-top:70px;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Georgia,"Times New Roman",serif}
+header{padding:28px 18px 8px;max-width:900px;margin:0 auto}
+h1{font:700 2rem/1.15 system-ui,sans-serif;margin:0 0 8px}
+h2,h3,th,nav,.tag{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+h2{font-size:1.35rem;margin:2.4em 0 .5em;color:var(--ac)}
+h3{font-size:1.02rem;margin:1.4em 0 .3em}
+.lead,.sub{color:var(--mut)}
+nav{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);border-bottom:1px solid var(--ln);padding:8px 18px;display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.85rem;z-index:5}
+main{max-width:900px;margin:0 auto;padding:0 18px 60px}
+p,li{max-width:72ch}
+a{color:var(--ac)}
+.wrap{overflow-x:auto;margin:10px 0}
+table{border-collapse:collapse;width:100%;min-width:560px;background:var(--card);font-size:.92rem}
+th,td{border:1px solid var(--ln);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+td:first-child{font-weight:700;white-space:nowrap}
+pre{background:var(--code);padding:12px;border-radius:5px;overflow-x:auto;font-size:.82rem;line-height:1.45}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--code);padding:1px 4px;border-radius:3px;font-size:.86em}
+pre code{background:none;padding:0}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0;font-family:system-ui,sans-serif;font-size:.88rem}
+.flow span{background:var(--card);border:1px solid var(--ln);border-radius:4px;padding:6px 10px}
+.flow i{color:var(--mut);font-style:normal}
+.warn{border-left:4px solid var(--ac2);background:var(--card);padding:8px 14px;margin:14px 0}
+details{background:var(--card);border:1px solid var(--ln);border-radius:5px;padding:8px 14px;margin:8px 0}
+summary{cursor:pointer;font:600 .98rem system-ui,sans-serif}
+</style>
+</head>
+<body>
+<header>
+<h1>Cisco XDR Automation and APIs</h1>
+<p class="lead">One-page reference: how the pieces fit, what each term means, how to call the APIs, and how to build and debug automation.</p>
+</header>
+<nav>
+<a href="#map">Big picture</a><a href="#terms">Glossary</a><a href="#workspace">Workspace</a><a href="#wf">Workflows</a><a href="#trig">Triggers</a><a href="#pb">Playbooks</a><a href="#cb">Casebooks</a><a href="#api">APIs</a><a href="#ex">Examples</a><a href="#bp">Best practices</a><a href="#fix">Troubleshooting</a>
+</nav>
+<main>
+<div class="warn"><b>Accuracy note.</b> Cisco XDR changes often. Concepts here are stable; exact menu names, endpoint paths and limits should be confirmed in your tenant and on developer.cisco.com. I flag the items I am less sure of. Also, "workbook" is not an official Cisco XDR term: the closest things are the <b>Workspace</b> page in Automation and <b>Casebooks</b> (both covered below).</div>
+
+<h2 id="map">1. The big picture</h2>
+<p>Cisco XDR collects telemetry from integrations, correlates it into <b>incidents</b>, and lets you respond. Automation is the engine that turns analyst steps into repeatable, low-code <b>workflows</b>. Everything in the console is backed by REST APIs, so anything you can click you can usually script.</p>
+<div class="flow"><span>Integrations (data)</span><i>→</i><span>Detections</span><i>→</i><span>Incident</span><i>→</i><span>Automation rule / playbook</span><i>→</i><span>Workflow</span><i>→</i><span>Target (CrowdStrike, ServiceNow, email...)</span><i>→</i><span>Worklog</span></div>
+<p>Workflows can be started in several ways: by an automation rule, by a playbook task, from an observable's pivot menu, by a webhook, by a schedule, manually, or through the API.</p>
+
+<h2 id="terms">2. Glossary</h2>
+<div class="wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Incident</td><td>A group of correlated events with a priority score, affected assets, observables and a timeline.</td></tr>
+<tr><td>Observable</td><td>An indicator such as an IP, domain, URL, file hash, email or hostname. Observables get verdicts (clean, suspicious, malicious) and appear in pivot menus.</td></tr>
+<tr><td>Verdict / disposition</td><td>The reputation of an observable from sources like Talos and third-party feeds.</td></tr>
+<tr><td>Pivot menu</td><td>The context menu on an observable. Response and lookup workflows can be added to it.</td></tr>
+<tr><td>Workflow</td><td>A visual flow of activities and logic that does a job. Can call other workflows (child workflows).</td></tr>
+<tr><td>Activity</td><td>One step in a workflow: an API request, a condition, a loop, a variable change, an approval, a wait, and so on.</td></tr>
+<tr><td>Atomic action</td><td>A prebuilt single-purpose action for a product (for example one call to an endpoint tool). Used as a building block.</td></tr>
+<tr><td>Target</td><td>A saved definition of a system a workflow talks to (host, protocol, authentication). Integrations often create their own targets automatically.</td></tr>
+<tr><td>Account key</td><td>A stored credential (username/password, token, key) referenced by a target so secrets stay out of workflow logic.</td></tr>
+<tr><td>Variable</td><td>A named value: workflow input, output, or local. Can be marked required or secure.</td></tr>
+<tr><td>Intent</td><td>The workflow type chosen at creation, which decides where it can be used (incident response, observable pivot, general).</td></tr>
+<tr><td>Automation rule</td><td>A trigger definition: conditions plus the workflows to run. A workflow only auto-runs if it is validated and attached to a rule.</td></tr>
+<tr><td>Webhook</td><td>A URL that accepts incoming data from an outside tool and can be wired to a rule to start workflows.</td></tr>
+<tr><td>Schedule</td><td>A time-based trigger for recurring workflows (reports, cleanup, polling).</td></tr>
+<tr><td>Playbook</td><td>A structured incident-response procedure: phases and tasks, each manual or backed by a workflow. A default playbook applies when none match.</td></tr>
+<tr><td>Casebook</td><td>A saved collection of observables and notes for an investigation (see section 7).</td></tr>
+<tr><td>Worklog</td><td>The record of what was done on an incident, including workflow runs and links to them.</td></tr>
+<tr><td>Exchange / XDR Connect</td><td>Cisco's catalog of ready-made workflows, atomic actions and integrations you can install or learn from.</td></tr>
+<tr><td>CTIM</td><td>Cisco Threat Intelligence Model: the common data model for threat information, regardless of source.</td></tr>
+<tr><td>IROH</td><td>The name of the underlying platform API family (inspect, enrich, response, private intel).</td></tr>
+</table></div>
+
+<h2 id="workspace">3. The Automation Workspace</h2>
+<p>The Workspace is your home inside Automation. It shows your own workflows and atomic actions, recently run workflows, and favorites. From the All Workflows view you create, import and organize workflows. Each workflow has a summary (description, categories, variables, triggers, targets). Installed-from-Exchange items offer Uninstall; your own show Delete. The documented tenant limit is 500 workflows.</p>
+<p>Use it for: finding and favoriting your frequently used workflows, checking recent runs, importing a colleague's exported workflow, and browsing what Cisco ships by default.</p>
+
+<h2 id="wf">4. Workflows in depth</h2>
+<h3>Anatomy</h3>
+<div class="flow"><span>Start</span><i>→</i><span>Inputs / variables</span><i>→</i><span>Activities and logic</span><i>→</i><span>Outputs</span><i>→</i><span>End (success / failure)</span></div>
+<h3>Common building blocks</h3>
+<ul>
+<li><b>Requests</b>: HTTP calls to any REST API through a target. This is where your API skills pay off.</li>
+<li><b>Logic</b>: conditions (if/else), loops over lists (for example each observable), parallel branches.</li>
+<li><b>Data handling</b>: set variables, parse JSON, extract fields with path expressions, build strings and bodies.</li>
+<li><b>Human steps</b>: approvals and notifications, so a person confirms risky actions.</li>
+<li><b>Sub-workflows</b>: reuse a tested workflow inside bigger ones.</li>
+<li><b>Waits and retries</b>: pause for asynchronous results, then check again.</li>
+</ul>
+<h3>Intents</h3>
+<div class="wrap"><table>
+<tr><th>Intent</th><th>Use it when</th></tr>
+<tr><td>Incident Response</td><td>The workflow works on an incident. It can be used by playbook tasks and can be triggered by an incident automation rule.</td></tr>
+<tr><td>Observable action</td><td>An analyst should run it from an observable's pivot menu. Once validated it appears wherever matching observable types do.</td></tr>
+<tr><td>General / other</td><td>Utilities, scheduled jobs, webhook handlers, sub-workflows.</td></tr>
+</table></div>
+<h3>Lifecycle</h3>
+<ol>
+<li>Create (choose intent) and define variables.</li>
+<li>Build activities, select targets.</li>
+<li><b>Validate</b>. Auto-triggering and pivot menu placement only work after validation.</li>
+<li>Run manually with test data, inspect each step's inputs and outputs in the execution view.</li>
+<li>Attach to a rule or playbook task.</li>
+<li>Monitor through the Worklog and recent runs; export or import to move between tenants.</li>
+</ol>
+<p class="sub">When you export a workflow, its associated automation rules go with it, so check the rule type before sharing.</p>
+
+<h2 id="trig">5. Triggers: rules, webhooks, schedules</h2>
+<div class="wrap"><table>
+<tr><th>Trigger</th><th>Starts when</th><th>Example</th></tr>
+<tr><td>Incident rule</td><td>An incident matching your conditions is created.</td><td>Priority score above a threshold, so create a ticket.</td></tr>
+<tr><td>Webhook rule</td><td>An external system posts data to the webhook URL.</td><td>A network dashboard sends an alert and XDR opens an incident.</td></tr>
+<tr><td>Schedule</td><td>A time pattern fires.</td><td>Nightly job that lists open high-priority incidents and emails a summary.</td></tr>
+<tr><td>Pivot menu</td><td>An analyst selects it on an observable.</td><td>Block this hash.</td></tr>
+<tr><td>Playbook task</td><td>The task is reached in a playbook.</td><td>Contain affected device step.</td></tr>
+<tr><td>API / manual</td><td>A person or script requests a run.</td><td>CI pipeline or test harness.</td></tr>
+</table></div>
+<p>Webhook setup order: create the webhook (Automate &gt; Triggers), create an automation rule using it, associate one or more workflows, and make sure the workflow contains an activity that handles the incoming payload.</p>
+
+<h2 id="pb">6. Playbooks</h2>
+<p>A playbook documents and drives the response process. Typical phases: triage, contain, eradicate, recover, close. Each task can be manual (instructions for the analyst) or backed by a workflow. Playbooks have their own rules that decide which incidents they apply to; incidents that match none get the default playbook. Cisco ships a managed playbook, and you can create custom ones and share them between teams (a Playbook API exists for this). The AI assistant can use playbooks too, according to Cisco's blog.</p>
+
+<h2 id="cb">7. Casebooks and "workbook" ideas</h2>
+<p>A <b>casebook</b> is a lightweight investigation container: you collect observables, add notes, and pivot from them. Use casebooks for hunting and ad hoc work, and incidents plus playbooks for formal response. If someone asks for a "workbook", clarify whether they mean a casebook (investigation notes), the Workspace page (automation home), or a playbook (response procedure). I believe casebooks are also reachable through the API; confirm the paths in the API docs.</p>
+
+<h2 id="api">8. APIs</h2>
+<h3>Services and base URLs (US region)</h3>
+<div class="wrap"><table>
+<tr><th>Service</th><th>Base URL</th><th>Use</th></tr>
+<tr><td>Platform (IROH)</td><td><code>https://visibility.amp.cisco.com/iroh/</code></td><td>Inspect (extract observables from text), Enrich (verdicts, sightings), Response (actions), integrations, users.</td></tr>
+<tr><td>Private Intel (CTIA)</td><td><code>https://private.intel.amp.cisco.com/ctia/</code></td><td>Store and share your own threat data; creating incidents.</td></tr>
+<tr><td>Automation</td><td><code>https://automate.us.security.cisco.com/api/</code></td><td>Manage automation objects and run workflows.</td></tr>
+<tr><td>Incidents and Investigations</td><td><code>https://conure.us.security.cisco.com/v2/</code></td><td>Search incidents and investigations.</td></tr>
+</table></div>
+<p>EU and APJC regions use their own hostnames (for example <code>visibility.eu.amp.cisco.com</code>, <code>automate.eu.security.cisco.com</code>, <code>automate.apjc.security.cisco.com</code>). Match your tenant's region or you get authentication errors.</p>
+<h3>Authentication</h3>
+<ol>
+<li>Administration &gt; API Clients (administrator only) and create a client. Pick scopes carefully (read versus write; for example enrich, response, private-intel, incident and automation scopes).</li>
+<li>Client credentials grant: send client id and password to the token endpoint, receive a short-lived JWT bearer token.</li>
+<li>Call APIs with <code>Authorization: Bearer &lt;token&gt;</code>. Request a new token when it expires.</li>
+</ol>
+<p>The other client type, OAuth Authorization Code, is for apps that ask other users to trust them and need a website to host.</p>
+<h3>Typical API tasks</h3>
+<div class="wrap"><table>
+<tr><th>Goal</th><th>API family</th></tr>
+<tr><td>Pull observables out of an alert's text</td><td>Inspect</td></tr>
+<tr><td>Get verdicts and sightings for an IP or hash</td><td>Enrich (deliberate, observe)</td></tr>
+<tr><td>Run a response action (block, isolate) through an integration</td><td>Response</td></tr>
+<tr><td>List or update incidents, get details</td><td>Incidents and Investigations</td></tr>
+<tr><td>Create an incident from another tool</td><td>Private Intel (CTIA) incident objects</td></tr>
+<tr><td>List, run, monitor workflows</td><td>Automation</td></tr>
+<tr><td>Create or share playbooks</td><td>Playbook</td></tr>
+</table></div>
+<p class="sub">Exact endpoint paths and payloads vary; use the interactive explorer on developer.cisco.com/docs/cisco-xdr, which includes read-only demo credentials.</p>
+
+<h2 id="ex">9. Worked examples</h2>
+<details open><summary>Python: get a token and enrich an IP</summary>
+<pre><code>import requests
+TOKEN_URL = "https://visibility.amp.cisco.com/iroh/oauth2/token"  # confirm for your region
+tok = requests.post(TOKEN_URL, auth=(CLIENT_ID, CLIENT_PW),
+                    data={"grant_type": "client_credentials"}).json()["access_token"]
+H = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+
+url = "https://visibility.amp.cisco.com/iroh/iroh-enrich/deliberate/observables"  # verify path
+r = requests.post(url, headers=H, json=[{"type": "ip", "value": "8.8.8.8"}])
+print(r.json())</code></pre></details>
+<details><summary>Workflow pattern: enrich every observable in an incident</summary>
+<ol>
+<li>Input: incident id. Request: fetch the incident and its observables.</li>
+<li>Loop over observables.</li>
+<li>Inside the loop: request verdict; condition on "malicious".</li>
+<li>Collect malicious ones into a list variable.</li>
+<li>If the list is not empty: add a note to the incident and branch to approval, then containment.</li>
+</ol></details>
+<details><summary>Workflow pattern: webhook to incident</summary>
+<ol>
+<li>Create webhook and rule; copy URL into the external tool.</li>
+<li>Workflow reads the payload and extracts key fields.</li>
+<li>Build an incident object (title, description, observables, severity).</li>
+<li>POST it through the Private Intel API, then notify a chat channel.</li>
+</ol></details>
+<details><summary>Workflow pattern: safe containment</summary>
+<ol>
+<li>Look up the asset; stop if unknown.</li>
+<li>Check an allowlist of critical hosts; require senior approval for those.</li>
+<li>Approve, isolate, verify status, write to worklog.</li>
+<li>Provide a reverse workflow to un-isolate.</li>
+</ol></details>
+
+<h2 id="bp">10. Best practices</h2>
+<ul>
+<li>Keep credentials in account keys; mark variables secure.</li>
+<li>Build small workflows and compose them with sub-workflows.</li>
+<li>Always write results back to the incident so the worklog is complete.</li>
+<li>Add error branches; a silent failure is worse than a loud one.</li>
+<li>Add approvals for destructive actions and allowlists for critical assets.</li>
+<li>Use least-privilege API clients; one client per integration or script.</li>
+<li>Name consistently (for example <code>SN - Create ticket</code>) and use descriptions and categories.</li>
+<li>Test with synthetic incidents first; rules can fire in bulk against real ones.</li>
+<li>Be idempotent: check whether a ticket or block already exists before creating one.</li>
+<li>Respect API rate limits; add waits and paging in loops.</li>
+</ul>
+
+<h2 id="fix">11. Troubleshooting</h2>
+<div class="wrap"><table>
+<tr><th>Symptom</th><th>Likely cause and fix</th></tr>
+<tr><td>401 Unauthorized</td><td>Expired token, wrong client secret, or wrong region host. Re-request the token.</td></tr>
+<tr><td>403 Forbidden</td><td>API client lacks the scope. Edit scopes or create a new client.</td></tr>
+<tr><td>Workflow never starts from a rule</td><td>Workflow not validated, not attached to the rule, or the rule conditions never match. Test with a loose condition.</td></tr>
+<tr><td>Not in the pivot menu</td><td>Wrong intent or observable type, or not validated.</td></tr>
+<tr><td>Target errors</td><td>Wrong account key, certificate or network path from the cloud to the product, or missing integration license.</td></tr>
+<tr><td>Empty variable values</td><td>Wrong JSON path. Inspect the raw response in the execution view and fix the extraction.</td></tr>
+<tr><td>Integration action missing</td><td>Integration not enabled, or the licensing tier does not include it.</td></tr>
+</table></div>
+<h3>Where to learn more</h3>
+<ul>
+<li>docs.xdr.security.cisco.com: product documentation, including Automate, workflows and integrations.</li>
+<li>developer.cisco.com/docs/cisco-xdr: APIs, authentication, interactive explorer.</li>
+<li>Cisco XDR Connect / Automation Exchange: workflows to install and study.</li>
+</ul>
+</main>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cisco XDR Automation: Work Summary</title>
+<style>
+:root{--bg:#f7f8fa;--fg:#1d242c;--mut:#5d6874;--ac:#0b5f93;--ok:#17794d;--wip:#a8650c;--no:#7b8794;--card:#fff;--ln:#dbe0e6;--code:#edf0f4;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14181d;--fg:#e6eaee;--mut:#9aa5b1;--ac:#62b6ea;--ok:#5fd49b;--wip:#f0b05f;--no:#a3adb8;--card:#1c2127;--ln:#313a44;--code:#252c34}}
+:root[data-theme="dark"]{--bg:#14181d;--fg:#e6eaee;--mut:#9aa5b1;--ac:#62b6ea;--ok:#5fd49b;--wip:#f0b05f;--no:#a3adb8;--card:#1c2127;--ln:#313a44;--code:#252c34}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:24px 18px 60px}
+h1{font-size:1.85rem;line-height:1.2;margin:.2em 0}
+h2{font-size:1.3rem;margin:2.1em 0 .5em;color:var(--ac);border-bottom:2px solid var(--ac);padding-bottom:3px}
+h3{font-size:1.02rem;margin:1.5em 0 .3em}
+.sub{color:var(--mut)}
+p,li{max-width:74ch}
+.wrap{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;width:100%;min-width:560px;background:var(--card);font-size:.92rem}
+th,td{border:1px solid var(--ln);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+td:first-child{font-weight:600}
+.s{font-weight:700;white-space:nowrap}
+.done{color:var(--ok)}.wip{color:var(--wip)}.no{color:var(--no)}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0;font-size:.88rem}
+.flow span{background:var(--card);border:1px solid var(--ln);border-radius:4px;padding:6px 10px}
+.flow i{color:var(--mut);font-style:normal}
+blockquote{margin:6px 0;padding:6px 12px;border-left:3px solid var(--ac);background:var(--card);font-size:.9rem;color:var(--mut)}
+.box{border-left:4px solid var(--wip);background:var(--card);padding:8px 14px;margin:14px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Cisco XDR Automation: Work Summary</h1>
+<p class="sub">What was built in the Cisco XDR proof-of-value (POV) environment for the "Response / Automation / Workflow" (R.A.W) requirements, why it was built, and how the parts fit together.</p>
+
+<h2>1. Purpose</h2>
+<p>The POV requirements sheet asks Cisco XDR to show that it can respond to threats faster, using automation instead of manual steps. The R.A.W section has four tests: create a ticket, complete a containment workflow, create a trigger, and create a custom playbook. This work covers the trigger and the playbook, and prepares the ground for the other two.</p>
+
+<h2>2. Key terms in plain language</h2>
+<div class="wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Incident</td><td>A group of related security alerts that XDR combines into one case, with a priority score.</td></tr>
+<tr><td>Workflow</td><td>A low-code flowchart that performs steps automatically (send a message, call another system, make a decision).</td></tr>
+<tr><td>Automation rule</td><td>A "when this happens, run that" instruction. It starts a workflow when an incident matches conditions.</td></tr>
+<tr><td>Playbook</td><td>A phased checklist that guides an analyst through responding to an incident. Tasks can be manual or run a workflow.</td></tr>
+<tr><td>Assignment rule</td><td>Decides which playbook is attached to a new incident.</td></tr>
+<tr><td>Target and account key</td><td>The saved connection to an outside system, and the stored login it uses.</td></tr>
+<tr><td>Worklog</td><td>The record of everything that happened on an incident.</td></tr>
+</table></div>
+
+<h2>3. How the parts fit together</h2>
+<div class="flow"><span>New incident</span><i>→</i><span>Automation rule checks conditions</span><i>→</i><span>Workflow runs automatically</span></div>
+<div class="flow"><span>New incident</span><i>→</i><span>Assignment rule attaches playbook</span><i>→</i><span>Analyst works the tasks</span><i>→</i><span>Worklog records it</span></div>
+<p>The automation rule and workflows are the <b>automatic</b> side: they act without anyone clicking. The playbook is the <b>guided</b> side: it tells an analyst what to do next and records that it was done. A playbook task can also run a workflow, so the two meet at that point.</p>
+
+<h2>4. What was built</h2>
+<div class="wrap"><table>
+<tr><th>Item</th><th>What it is and why</th><th>Status</th></tr>
+<tr><td>Hello-XDR (workflow)</td><td>A learning workflow. It takes a name and an IP address and uses a condition block to decide whether the address is private or public, then builds a message. Used to learn the workflow editor and execution view.</td><td class="s done">Built and run successfully</td></tr>
+<tr><td>Rule-Test (workflow)</td><td>A deliberately small Incident Response workflow with one step that sets a variable. It exists to prove an automation rule can start a workflow, and to serve as a safe task inside the playbook.</td><td class="s done">Validated, run manually and by a rule</td></tr>
+<tr><td>Automation rule "Test - any incident"</td><td>Runs Rule-Test when an incident is created or its status changes. A priority-score condition was added so that only high-priority incidents trigger it, matching the sheet's example of a score above 800.</td><td class="s done">Fired successfully (run history shows it as the starter)</td></tr>
+<tr><td>Email notification workflow</td><td>A ready-made workflow from the Cisco Exchange that emails the team about an incident. This is the sheet's "priority score sends an email" example.</td><td class="s wip">Installed, not working yet (needs a mail account that allows SMTP sign-in)</td></tr>
+<tr><td>Email account key and target</td><td>The stored login and SMTP server the email workflow uses.</td><td class="s wip">Needs valid credentials</td></tr>
+<tr><td>Custom playbook "HCL - Standard Response"</td><td>A four-phase response checklist (Identification, Containment, Eradication, Recovery) with a task in each phase.</td><td class="s done">Published (not set as default)</td></tr>
+<tr><td>Custom playbook tasks</td><td>Five tasks created for the playbook. The Eradication phase uses a Cisco-managed task.</td><td class="s done">Created</td></tr>
+<tr><td>Playbook assignment rule</td><td>Attaches the playbook to new incidents matching a condition. Playbooks attach only at incident creation.</td><td class="s wip">To be created or confirmed</td></tr>
+</table></div>
+
+<h2>5. The playbook in detail</h2>
+<div class="wrap"><table>
+<tr><th>Phase</th><th>Task</th><th>Purpose</th></tr>
+<tr><td>Identification</td><td>Review incident summary and affected assets</td><td>Understand what happened and which systems are involved. Manual.</td></tr>
+<tr><td>Identification</td><td>Check observable verdicts</td><td>Check whether IPs, domains and files are known to be malicious. Manual.</td></tr>
+<tr><td>Identification</td><td>Run test workflow</td><td>Demonstrates a playbook task that runs an automated workflow (Rule-Test).</td></tr>
+<tr><td>Containment</td><td>Contain affected host</td><td>Placeholder for the containment workflow, to isolate an endpoint.</td></tr>
+<tr><td>Eradication</td><td>Remove Malicious Content (Cisco managed)</td><td>Record the action taken to remove the threat.</td></tr>
+<tr><td>Recovery</td><td>Document findings and close incident</td><td>Write up the outcome and close the case.</td></tr>
+</table></div>
+
+<h2>6. Suggested description text</h2>
+<p>These can be pasted into the description fields so others understand each object.</p>
+<h3>Rule-Test workflow</h3>
+<blockquote>Test workflow with an Incident Response intent. Runs when an automation rule fires on an incident, and sets a note variable. Used to verify that rules start workflows and as a placeholder task in the HCL playbook.</blockquote>
+<h3>Automation rule</h3>
+<blockquote>Runs for incidents whose priority score is above 800, to notify the response team and start automated steps. Evaluated when an incident is created or its status changes.</blockquote>
+<h3>Playbook</h3>
+<blockquote>Standard triage, containment and closure steps for the HCL POV. Guides an analyst through identification, containment, eradication and recovery.</blockquote>
+<h3>Playbook tasks</h3>
+<blockquote><b>Review incident summary and affected assets:</b> Read the incident summary, note the main affected assets in the worklog.<br><b>Check observable verdicts:</b> Look up each observable's verdict and record any that are malicious.<br><b>Run test workflow:</b> Run the linked workflow and confirm it completes successfully.<br><b>Contain affected host:</b> Isolate the affected endpoint after approval, and record the result.<br><b>Document findings and close incident:</b> Summarize what happened, actions taken and lessons, then close the incident.</blockquote>
+
+<h2>7. What has been demonstrated</h2>
+<ul>
+<li>Workflows can be built in the low-code editor, validated, run, and inspected step by step.</li>
+<li>An automation rule starts a workflow by itself when an incident matches its conditions. The workflow run history shows the rule as the starter.</li>
+<li>A custom playbook with task phases can be created and published, and tasks can be manual or run workflows.</li>
+</ul>
+
+<h2>8. Open items</h2>
+<div class="box"><b>Not yet done.</b> These are honest gaps, not failures.</div>
+<ul>
+<li><b>Email delivery:</b> the email workflow needs an SMTP account that accepts a password sign-in from XDR (for example a Gmail app password, or the company mailbox once IT enables authenticated SMTP). Until then, the "trigger sends an email" part is not proven.</li>
+<li><b>Assignment rule:</b> create or confirm it, then walk a new incident through the playbook. Existing incidents cannot receive the playbook.</li>
+<li><b>Task descriptions:</b> replace the placeholder text under some tasks with real instructions.</li>
+<li><b>Create Ticket (ServiceNow):</b> not started. Needs a ServiceNow instance and credentials.</li>
+<li><b>Complete Containment:</b> not started. Needs the endpoint tool integration (CrowdStrike) and a lab host. It will replace the placeholder containment task.</li>
+</ul>
+
+<h2>9. Where the sheet stands</h2>
+<div class="wrap"><table>
+<tr><th>Sheet row</th><th>State</th><th>What remains</th></tr>
+<tr><td>Create a Trigger</td><td class="s wip">Partly met</td><td>Rule fires and runs a workflow. Email delivery remains.</td></tr>
+<tr><td>Create a Custom Playbook</td><td class="s wip">Mostly met</td><td>Assignment rule and a completed incident walk-through remain.</td></tr>
+<tr><td>Create Ticket (ServiceNow)</td><td class="s no">Not started</td><td>Whole item.</td></tr>
+<tr><td>Complete Containment Workflow</td><td class="s no">Not started</td><td>Whole item.</td></tr>
+</table></div>
+<p class="sub">Evidence to attach for each row: screenshots of the configuration, the workflow run history, and the incident worklog.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cisco XDR Basics Lab</title>
+<style>
+:root{--bg:#f8f7fb;--fg:#22202b;--mut:#66627a;--ac:#5a3fc0;--ok:#16794c;--card:#fff;--ln:#dcd9e8;--code:#efedf6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#16141d;--fg:#e8e6f0;--mut:#a29fb5;--ac:#a99bff;--ok:#5bd69a;--card:#1f1c29;--ln:#35314a;--code:#282538}}
+:root[data-theme="dark"]{--bg:#16141d;--fg:#e8e6f0;--mut:#a29fb5;--ac:#a99bff;--ok:#5bd69a;--card:#1f1c29;--ln:#35314a;--code:#282538}
+html{scroll-padding-top:56px;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:820px;margin:0 auto;padding:22px 18px 60px}
+h1{font-size:1.8rem;line-height:1.2;margin:.2em 0}
+h2{font-size:1.3rem;margin:2.2em 0 .4em;color:var(--ac);border-bottom:2px solid var(--ac);padding-bottom:3px}
+h3{font-size:1.02rem;margin:1.4em 0 .3em}
+p,li{max-width:72ch}
+.sub{color:var(--mut)}
+nav{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);display:flex;gap:6px 14px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--ln);font-size:.88rem}
+a{color:var(--ac)}
+.wrap{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;width:100%;min-width:520px;background:var(--card);font-size:.92rem}
+th,td{border:1px solid var(--ln);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+pre{background:var(--code);padding:11px;border-radius:5px;overflow-x:auto;font-size:.8rem;line-height:1.45}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--code);padding:1px 4px;border-radius:3px;font-size:.86em}
+pre code{background:none;padding:0}
+.box{border-left:4px solid var(--ac);background:var(--card);padding:8px 14px;margin:14px 0}
+.ok{border-left-color:var(--ok)}
+ol.s>li{margin:.5em 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Cisco XDR Basics Lab</h1>
+<p class="sub">Three small exercises: a low-code workflow, the same idea through the API, and a basic playbook. No ServiceNow, CrowdStrike or other third-party system is needed.</p>
+<nav><a href="#c">Concepts</a><a href="#s">Setup</a><a href="#l1">Lab 1</a><a href="#l2">Lab 2</a><a href="#l3">Lab 3</a><a href="#v">Checklist</a><a href="#n">Next</a></nav>
+<div class="box"><b>Heads-up.</b> Button and menu names change between Cisco releases. I describe each step by what it does, so if a label differs, look for the closest one. Items I could not verify are marked "check".</div>
+
+<h2 id="c">1. The six concepts you need</h2>
+<div class="wrap"><table>
+<tr><th>Concept</th><th>Plain meaning</th></tr>
+<tr><td><b>Workflow</b></td><td>A flowchart that does a job: start, steps, end.</td></tr>
+<tr><td><b>Variable</b></td><td>A named box holding a value. Inputs come in, outputs go out, locals are scratch space.</td></tr>
+<tr><td><b>Activity</b></td><td>One step in the flowchart (set a variable, make a request, make a decision).</td></tr>
+<tr><td><b>Target</b></td><td>A saved connection to a system you call, with its credentials.</td></tr>
+<tr><td><b>Intent</b></td><td>The kind of workflow you pick when creating it. It decides where it can be used.</td></tr>
+<tr><td><b>Playbook</b></td><td>A checklist for responding to an incident, where tasks can be manual or run a workflow.</td></tr>
+</table></div>
+<p>Also useful: an <b>observable</b> is an IP, domain, hash and so on; a <b>pivot menu</b> is the right-click menu on one; an <b>automation rule</b> starts a workflow automatically; the <b>worklog</b> records what ran.</p>
+
+<h2 id="s">2. Setup (once)</h2>
+<ol class="s">
+<li><b>Log in</b> to your Cisco XDR tenant (use the region URL you were given).</li>
+<li><b>Open Automate</b> in the left navigation. Find the Workspace page and the Workflows list. Look around; nothing needs creating yet.</li>
+<li><b>Create an API client</b> (needed for Lab 2): Administration &gt; API Clients &gt; add a client with read scopes for enrich and incidents. Copy the client id and password immediately and store them in environment variables, not in files.</li>
+<li><b>Install Python 3</b> and the requests library: <code>pip install requests</code>.</li>
+<li><b>Know your region</b>: US, EU or APJC. It changes the API host names.</li>
+</ol>
+
+<h2 id="l1">3. Lab 1: low-code workflow</h2>
+<p><b>Goal:</b> build "Hello XDR", a workflow that takes a name and an IP, decides whether the IP is private, and returns a message. No external system, so nothing can break except your logic.</p>
+<h3>Variables</h3>
+<div class="wrap"><table>
+<tr><th>Name</th><th>Type</th><th>Kind</th><th>Example</th></tr>
+<tr><td>name</td><td>string</td><td>input</td><td>Asha</td></tr>
+<tr><td>ip</td><td>string</td><td>input</td><td>10.1.2.3</td></tr>
+<tr><td>is_private</td><td>boolean</td><td>local</td><td>true</td></tr>
+<tr><td>message</td><td>string</td><td>output</td><td>Hello Asha, 10.1.2.3 is a private address</td></tr>
+</table></div>
+<h3>Build steps</h3>
+<ol class="s">
+<li>Automate &gt; Workflows &gt; create new workflow. Name it <code>Hello XDR</code>. Choose a general intent (not tied to incidents) and write a description.</li>
+<li>Add the four variables above. Mark <code>name</code> and <code>ip</code> as inputs, <code>message</code> as an output.</li>
+<li>Add a <b>Set Variable</b> activity: <code>is_private</code> = whether <code>ip</code> starts with <code>10.</code>, <code>192.168.</code> or <code>172.16.</code> through <code>172.31.</code>. In the expression editor use a "starts with" or regex-match condition (check which your editor offers). Simplest version: a <b>Condition</b> activity with three "starts with" checks joined by OR.</li>
+<li>On the <b>true</b> branch add Set Variable: <code>message</code> = <code>Hello {{name}}, {{ip}} is a private address</code>.</li>
+<li>On the <b>false</b> branch set <code>message</code> = <code>Hello {{name}}, {{ip}} is a public address</code>.</li>
+<li>Connect both branches to the end. Use the variable picker to insert <code>{{name}}</code> style references rather than typing them.</li>
+<li><b>Validate</b> the workflow and fix any red errors (usually an unconnected branch or an empty field).</li>
+<li><b>Run</b> it with test values and open the execution view. Click each activity and read its inputs and outputs; this is the single best way to learn.</li>
+<li>Run again with <code>8.8.8.8</code> and confirm the false branch.</li>
+</ol>
+<h3>Level 2: add a real lookup</h3>
+<p>Extend the workflow to ask XDR itself for the IP's verdict. Create a new workflow <code>IP Verdict</code> with <code>ip</code> as input and an HTTP request activity that POSTs to the Enrich deliberate endpoint (path below, check against the API explorer) with body <code>[{"type":"ip","value":"{{ip}}"}]</code>. This request needs a target pointing at the XDR platform host and an authentication method using your API client; if your tenant offers a built-in XDR target or a token atomic action, use that. Then pull the verdict from the response using the editor's path or JSON-extract option and output it as <code>verdict</code>.</p>
+
+<h2 id="l2">4. Lab 2: the same thing through the API</h2>
+<p><b>Goal:</b> do the verdict lookup from code, so you see what the workflow's HTTP activity does behind the scenes.</p>
+<div class="wrap"><table>
+<tr><th>Step</th><th>What happens</th></tr>
+<tr><td>1</td><td>Exchange client id and password for a bearer token.</td></tr>
+<tr><td>2</td><td>Send the IP to the Enrich deliberate endpoint with that token.</td></tr>
+<tr><td>3</td><td>Read the verdict from the response.</td></tr>
+</table></div>
+<pre><code>import os, json, requests
+
+REGION = os.environ.get("XDR_REGION", "us")   # us | eu | apjc
+HOST = {"us": "visibility.amp.cisco.com",
+        "eu": "visibility.eu.amp.cisco.com",
+        "apjc": "visibility.apjc.amp.cisco.com"}[REGION]
+
+# 1. token (check the Authentication page for the exact path in your region)
+TOKEN_URL = f"https://{HOST}/iroh/oauth2/token"
+resp = requests.post(TOKEN_URL,
+        auth=(os.environ["XDR_ID"], os.environ["XDR_PW"]),
+        data={"grant_type": "client_credentials"})
+resp.raise_for_status()
+token = resp.json()["access_token"]
+H = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+# 2. verdict lookup (check the path in the API explorer)
+URL = f"https://{HOST}/iroh/iroh-enrich/deliberate/observables"
+body = [{"type": "ip", "value": "8.8.8.8"}]
+r = requests.post(URL, headers=H, json=body)
+print("HTTP", r.status_code)
+
+# 3. read result
+print(json.dumps(r.json(), indent=2)[:1500])</code></pre>
+<h3>How to run it</h3>
+<pre><code>export XDR_ID="client-xxxx"
+export XDR_PW="your-password"
+export XDR_REGION="us"
+python verdict.py</code></pre>
+<h3>Reading the result</h3>
+<ul>
+<li><code>200</code> means success; the JSON lists verdicts by module (source) with a disposition such as clean, suspicious or malicious.</li>
+<li><code>401</code> means the token is wrong or expired, or the region host is wrong.</li>
+<li><code>403</code> means your API client lacks the enrich scope.</li>
+</ul>
+<h3>Running workflows by API</h3>
+<p>The Automation API (<code>https://automate.us.security.cisco.com/api/</code>, or the eu/apjc equivalents) manages automation objects and runs workflows. I do not have its exact endpoints verified, so open the Automation section of the interactive API documentation on developer.cisco.com, find the "list workflows" and "run workflow" operations, and try them with the same bearer token. Start with the list call: it is read-only and proves the token has automation access. Then run <code>Hello XDR</code> with <code>{"name":"Asha","ip":"10.1.2.3"}</code> as input.</p>
+<div class="box ok"><b>Comparison:</b> the workflow in Lab 1 is the same sequence as this script, with the editor hiding the token and JSON handling. When something fails in the editor, reproduce it here to see the raw response.</div>
+
+<h2 id="l3">5. Lab 3: a basic playbook</h2>
+<p><b>Goal:</b> a three-task playbook that you can run against any incident, using Lab 1's workflow.</p>
+<div class="wrap"><table>
+<tr><th>Phase</th><th>Task</th><th>Type</th></tr>
+<tr><td>Triage</td><td>Read the incident summary and note the main asset</td><td>Manual</td></tr>
+<tr><td>Triage</td><td>Run <code>Hello XDR</code> (or a verdict workflow) on an IP from the incident</td><td>Workflow</td></tr>
+<tr><td>Close</td><td>Write a one-line conclusion and close the incident</td><td>Manual</td></tr>
+</table></div>
+<ol class="s">
+<li>Workflows used by a playbook must be of a type playbooks can run. If <code>Hello XDR</code> does not appear in the task picker, create a copy with the <b>Incident Response</b> intent, since that intent is designed for playbook tasks (check how your tenant labels it).</li>
+<li>Create a new playbook under Automate (the playbook area), name it <code>Learning playbook</code>.</li>
+<li>Add the phases and tasks from the table. Write clear instructions on the manual ones.</li>
+<li>Set it so it does not auto-apply to everything: give it a narrow rule, or leave rules empty and assign it manually (check what your tenant allows).</li>
+<li>Open a low-risk incident, assign the playbook, and step through the tasks.</li>
+<li>Afterwards open the incident's worklog and confirm the workflow run is listed.</li>
+</ol>
+
+<h2 id="v">6. Verification checklist</h2>
+<ol class="s">
+<li>I can log in and find Automate, Workflows and the playbook area.</li>
+<li>I created an API client and stored the secret safely.</li>
+<li>My script prints a token response and a verdict (or I understand the error code).</li>
+<li><code>Hello XDR</code> validates and returns the right message for private and public IPs.</li>
+<li>I read the execution view for each activity.</li>
+<li>The playbook completes on a test incident and the worklog shows the run.</li>
+</ol>
+
+<h2 id="n">7. What to learn next</h2>
+<ul>
+<li>Loops: run a lookup for every observable in an incident.</li>
+<li>Pivot-menu workflows: right-click an observable and run your workflow.</li>
+<li>An automation rule to start a workflow when an incident is created.</li>
+<li>A real target such as email or a ticketing system, using account keys.</li>
+<li>Error branches and approvals before any risky action.</li>
+</ul>
+<p class="sub">Ask for any of these and I will build the next lab in the same style.</p>
+</main>
+</body>
+</html>

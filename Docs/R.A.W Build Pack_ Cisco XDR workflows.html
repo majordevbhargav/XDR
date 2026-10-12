@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>R.A.W Build Pack: Cisco XDR workflows</title>
+<style>
+:root{--bg:#f6f7f4;--fg:#1f2428;--mut:#5f686f;--ac:#0b6a52;--ac2:#a8480c;--card:#fff;--ln:#d6dbd5;--code:#ecefea;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13181a;--fg:#e5e9e8;--mut:#98a3a1;--ac:#4fc9a2;--ac2:#f0a063;--card:#1b2124;--ln:#2f393b;--code:#242c2f}}
+:root[data-theme="dark"]{--bg:#13181a;--fg:#e5e9e8;--mut:#98a3a1;--ac:#4fc9a2;--ac2:#f0a063;--card:#1b2124;--ln:#2f393b;--code:#242c2f}
+html{scroll-padding-top:60px;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:22px 18px 60px}
+h1{font-size:1.8rem;line-height:1.2;margin:.2em 0}
+h2{font-size:1.35rem;margin:2.2em 0 .4em;padding:6px 10px;background:var(--ac);color:#fff;border-radius:4px}
+h3{font-size:1.02rem;margin:1.4em 0 .3em;color:var(--ac)}
+.sub{color:var(--mut)}
+p,li{max-width:76ch}
+nav{display:flex;gap:6px 14px;flex-wrap:wrap;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding:8px 0;border-bottom:1px solid var(--ln);font-size:.88rem}
+a{color:var(--ac)}
+.wrap{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;width:100%;min-width:600px;background:var(--card);font-size:.9rem}
+th,td{border:1px solid var(--ln);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+pre{background:var(--code);padding:11px;border-radius:5px;overflow-x:auto;font-size:.8rem;line-height:1.45}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--code);padding:1px 4px;border-radius:3px;font-size:.86em}
+pre code{background:none;padding:0}
+.warn{border-left:4px solid var(--ac2);background:var(--card);padding:8px 14px;margin:14px 0}
+.meta{display:flex;gap:8px 20px;flex-wrap:wrap;font-size:.88rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1>R.A.W Build Pack</h1>
+<p class="sub">Blueprints for the four Response/Automation/Workflow rows in the HCL sheet: Create Ticket, Complete Containment, Create a Trigger, Create a Custom Playbook. Three workflows plus one rule and one playbook.</p>
+<nav><a href="#pre">Prerequisites</a><a href="#wf1">WF1 Ticket</a><a href="#wf2">WF2 Contain</a><a href="#wf3">WF3 Trigger</a><a href="#pb">Playbook</a><a href="#py">Pre-flight script</a><a href="#ev">Evidence</a></nav>
+<div class="warn"><b>Read first.</b> These are blueprints, not importable files: Cisco's export format is not something I can reliably hand-write. Activity names and field labels in the editor vary by version, so I describe each step by what it does. Where an out-of-the-box atomic action exists for CrowdStrike or ServiceNow in your tenant, prefer it over the raw HTTP request shown here. Use placeholders like <code>{{incident.id}}</code> to mean "insert the variable with the editor's picker".</div>
+
+<h2 id="pre">0. Prerequisites checklist</h2>
+<div class="wrap"><table>
+<tr><th>Item</th><th>How to confirm</th></tr>
+<tr><td>XDR API client</td><td>Administration &gt; API Clients; created and tested (token works).</td></tr>
+<tr><td>ServiceNow instance + service account</td><td>Account can create and update records in the <code>incident</code> table. Run the pre-flight script below.</td></tr>
+<tr><td>CrowdStrike integration enabled in XDR</td><td>Administration &gt; Integrations shows it connected; a CrowdStrike target exists. API client in CrowdStrike has Hosts (read/write) and IOC scopes.</td></tr>
+<tr><td>Lab endpoint with the Falcon sensor</td><td>A throwaway VM to isolate and un-isolate. Never test on a production host.</td></tr>
+<tr><td>Test incidents</td><td>A few existing low-risk incidents, or a way to generate one (the sheet's TOR or renamed-process tests).</td></tr>
+<tr><td>Account keys and targets</td><td>ServiceNow account key and target; CrowdStrike target from the integration.</td></tr>
+</table></div>
+
+<h2 id="wf1">1. WF1: Create Ticket (ServiceNow)</h2>
+<div class="meta"><span>Sheet row: Create Ticket</span><span>Intent: Incident Response</span><span>Name: <code>SN - Create ticket from incident</code></span><span>Outcome: AR</span></div>
+<h3>Variables</h3>
+<div class="wrap"><table>
+<tr><th>Name</th><th>Type</th><th>Source</th></tr>
+<tr><td>incident_id</td><td>string, input</td><td>Supplied by the incident context</td></tr>
+<tr><td>incident_title, priority_score, incident_url</td><td>string, local</td><td>Read from the incident (title and score fields)</td></tr>
+<tr><td>ticket_number, ticket_sys_id</td><td>string, output</td><td>ServiceNow response</td></tr>
+<tr><td>snow_urgency</td><td>string, local</td><td>Mapped from score (below)</td></tr>
+</table></div>
+<h3>Steps</h3>
+<div class="wrap"><table>
+<tr><th>#</th><th>Activity</th><th>Configuration</th></tr>
+<tr><td>1</td><td>Get incident details</td><td>Use the incident-context input or an atomic action that returns title, priority score, link. Store in local variables.</td></tr>
+<tr><td>2</td><td>Map urgency</td><td>Condition on score: &gt;= 800 sets <code>1</code>, &gt;= 500 sets <code>2</code>, else <code>3</code>. Adjust thresholds with the customer.</td></tr>
+<tr><td>3</td><td>Duplicate check (idempotency)</td><td>GET <code>/api/now/table/incident?sysparm_query=correlation_id={{incident_id}}&amp;sysparm_limit=1&amp;sysparm_fields=number,sys_id</code>. If <code>result</code> has an item, set the outputs from it, skip to step 6.</td></tr>
+<tr><td>4</td><td>Create ticket</td><td>POST <code>/api/now/table/incident</code> via the ServiceNow target. Headers: <code>Content-Type: application/json</code>, <code>Accept: application/json</code>. Body below.</td></tr>
+<tr><td>5</td><td>Parse response</td><td>On HTTP 201: <code>result.number</code> to ticket_number, <code>result.sys_id</code> to ticket_sys_id. Otherwise go to the error branch.</td></tr>
+<tr><td>6</td><td>Write back to XDR</td><td>Add a note or worklog entry to the incident: "ServiceNow ticket {{ticket_number}} created." (Use the add-incident-note action available in your tenant.)</td></tr>
+<tr><td>7</td><td>Error branch</td><td>On failure, add a note with the HTTP status and message, then end as failed. Optionally email the SOC.</td></tr>
+</table></div>
+<pre><code>{
+  "short_description": "XDR incident: {{incident_title}}",
+  "description": "Priority score: {{priority_score}}\nXDR link: {{incident_url}}",
+  "urgency": "{{snow_urgency}}",
+  "impact": "2",
+  "category": "Security",
+  "correlation_id": "{{incident_id}}"
+}</code></pre>
+<p><b>Test:</b> run on a test incident; confirm a ticket appears in ServiceNow with the right fields; run again and confirm no second ticket is created; break the credentials and confirm the failure note appears.</p>
+
+<h2 id="wf2">2. WF2: Complete Containment (isolate endpoint, block hash)</h2>
+<div class="meta"><span>Sheet row: Complete Containment Workflow</span><span>Intents: Observable action (host) and Observable action (file hash)</span><span>Outcome: AR</span></div>
+<p>Build two small pivot-menu workflows plus a reverse one. The sheet's examples (isolate endpoint, block domain/URL, block hash) are "e.g.", so host isolation and hash blocking are enough to pass; add domain blocking only if an enforcement integration (for example a DNS security product) is connected.</p>
+<h3>2a. Isolate host: <code>CS - Isolate host</code></h3>
+<div class="wrap"><table>
+<tr><th>#</th><th>Activity</th><th>Configuration</th></tr>
+<tr><td>1</td><td>Input</td><td><code>hostname</code> (the observable value), <code>requested_by</code>.</td></tr>
+<tr><td>2</td><td>Find device</td><td>CrowdStrike atomic action, or GET <code>/devices/queries/devices/v1?filter=hostname:'{{hostname}}'</code>. Take <code>resources[0]</code> as device_id. If empty, add note "host not found" and end.</td></tr>
+<tr><td>3</td><td>Safety check</td><td>Condition: hostname in a protected list (domain controllers, core servers) means require approval from a senior role; else standard approval.</td></tr>
+<tr><td>4</td><td>Approval</td><td>Approval activity to the analyst or lead: "Isolate {{hostname}}?" with a timeout. Declined or timed out ends with a note.</td></tr>
+<tr><td>5</td><td>Isolate</td><td>POST <code>/devices/entities/devices-actions/v2?action_name=contain</code> with body <code>{"ids":["{{device_id}}"]}</code>.</td></tr>
+<tr><td>6</td><td>Verify</td><td>Wait 30 to 60 seconds, then GET <code>/devices/entities/devices/v2?ids={{device_id}}</code> and check <code>status</code> is <code>contained</code> (or the containing state). Retry a few times.</td></tr>
+<tr><td>7</td><td>Record</td><td>Add note to the incident: who approved, device id, result.</td></tr>
+</table></div>
+<h3>2b. Block hash: <code>CS - Block file hash</code></h3>
+<div class="wrap"><table>
+<tr><th>#</th><th>Activity</th><th>Configuration</th></tr>
+<tr><td>1</td><td>Input</td><td><code>sha256</code>. Condition: reject if the value is not 64 hex characters.</td></tr>
+<tr><td>2</td><td>Check verdict (optional)</td><td>Look up the hash verdict; warn if it is clean before blocking.</td></tr>
+<tr><td>3</td><td>Approval</td><td>Same pattern as 2a.</td></tr>
+<tr><td>4</td><td>Create IOC</td><td>POST <code>/iocs/entities/indicators/v1</code> with an indicator of type <code>sha256</code>, action <code>prevent</code>, <code>applied_globally: true</code>, and a description naming the incident. Check CrowdStrike's current body format.</td></tr>
+<tr><td>5</td><td>Record</td><td>Add note to the incident.</td></tr>
+</table></div>
+<h3>2c. Undo: <code>CS - Lift containment</code></h3>
+<p>Same lookup, then POST to the same devices-actions endpoint with <code>action_name=lift_containment</code>. You need this to reset your lab host after each test.</p>
+<p class="sub">CrowdStrike base URL depends on your cloud (for example <code>api.crowdstrike.com</code> or a regional one). If the XDR integration already provides atomic actions, those handle authentication for you and the raw paths above are only for reference.</p>
+<p><b>Test:</b> right-click the lab host in the incident graph, run Isolate, approve, confirm it loses network access in the Falcon console, run Lift, confirm it returns. Repeat for a harmless test hash (for example the EICAR file hash).</p>
+
+<h2 id="wf3">3. WF3: Create a Trigger (priority score rule)</h2>
+<div class="meta"><span>Sheet row: Create a Trigger</span><span>Object: automation rule + notification workflow</span><span>Outcome: AR</span></div>
+<h3>3a. Notification workflow: <code>Notify - High priority incident</code></h3>
+<ol>
+<li>Intent: Incident Response. Read title, score, link, top assets.</li>
+<li>Send the message: email (or Webex/Slack if connected) with subject "High priority XDR incident: {{incident_title}} (score {{priority_score}})" and the link in the body.</li>
+<li>Optionally call WF1 as a sub-workflow so one rule gives notification and ticket.</li>
+<li>Add a note to the incident that the notification was sent. Validate.</li>
+</ol>
+<h3>3b. The rule</h3>
+<div class="wrap"><table>
+<tr><th>Setting</th><th>Value</th></tr>
+<tr><td>Location</td><td>Automate &gt; Triggers &gt; Automation Rules</td></tr>
+<tr><td>Rule type</td><td>Incident rule</td></tr>
+<tr><td>Condition</td><td>Priority score greater than 800 (answers the sheet's "Priority Score ??" note; confirm the scale in your tenant)</td></tr>
+<tr><td>Action</td><td>Run <code>Notify - High priority incident</code> (and WF1 if not nested)</td></tr>
+</table></div>
+<p><b>Test:</b> first set the threshold low (for example 100) so existing incidents trigger it, confirm the email arrives and the worklog records a run, then raise it to 800 and note which incident exceeds it. Remember the workflow must be validated or the rule will not run it.</p>
+
+<h2 id="pb">4. Custom Playbook: <code>HCL - Standard response</code></h2>
+<div class="wrap"><table>
+<tr><th>Phase</th><th>Task</th><th>Type</th></tr>
+<tr><td>Triage</td><td>Review summary and observable verdicts</td><td>Manual</td></tr>
+<tr><td>Triage</td><td>Create ServiceNow ticket</td><td>Workflow: WF1</td></tr>
+<tr><td>Contain</td><td>Isolate affected host</td><td>Workflow: WF2a</td></tr>
+<tr><td>Contain</td><td>Block malicious hash</td><td>Workflow: WF2b</td></tr>
+<tr><td>Eradicate</td><td>Remove malware, reset credentials</td><td>Manual</td></tr>
+<tr><td>Recover</td><td>Lift containment after validation</td><td>Workflow: WF2c</td></tr>
+<tr><td>Close</td><td>Update ticket, document lessons</td><td>Manual</td></tr>
+</table></div>
+<p>Give the playbook a rule so it applies to incidents above your chosen score; others fall to the default playbook. Walk one test incident through every task.</p>
+
+<h2 id="py">5. Pre-flight script (Python)</h2>
+<p>Run this before building, to prove credentials and network paths work. Fill the placeholders; keep secrets in environment variables.</p>
+<pre><code>import os, requests
+
+# ---- ServiceNow ----
+SN = os.environ["SN_URL"]            # https://dev12345.service-now.com
+SN_AUTH = (os.environ["SN_USER"], os.environ["SN_PASS"])
+H = {"Content-Type": "application/json", "Accept": "application/json"}
+
+r = requests.post(f"{SN}/api/now/table/incident", auth=SN_AUTH, headers=H,
+    json={"short_description": "XDR preflight test", "correlation_id": "preflight-001"})
+print("SN create:", r.status_code, r.json().get("result", {}).get("number"))
+
+q = requests.get(f"{SN}/api/now/table/incident", auth=SN_AUTH, headers=H,
+    params={"sysparm_query": "correlation_id=preflight-001", "sysparm_limit": 1})
+print("SN dup-check found:", len(q.json().get("result", [])))
+
+# ---- CrowdStrike ----
+CS = os.environ.get("CS_BASE", "https://api.crowdstrike.com")
+t = requests.post(f"{CS}/oauth2/token", data={
+    "client_id": os.environ["CS_ID"], "client_secret": os.environ["CS_SECRET"]})
+tok = t.json()["access_token"]
+CH = {"Authorization": f"Bearer {tok}"}
+host = os.environ["CS_TEST_HOST"]
+d = requests.get(f"{CS}/devices/queries/devices/v1", headers=CH,
+                 params={"filter": f"hostname:'{host}'"})
+print("CS device ids:", d.json().get("resources"))
+
+# ---- Cisco XDR token ----
+x = requests.post(os.environ["XDR_TOKEN_URL"],
+    auth=(os.environ["XDR_ID"], os.environ["XDR_PW"]),
+    data={"grant_type": "client_credentials"})
+print("XDR token:", x.status_code)</code></pre>
+<p class="sub">This script only reads from CrowdStrike and creates one test ticket (delete it afterwards). It does not isolate anything.</p>
+
+<h2 id="ev">6. Evidence for the sheet</h2>
+<div class="wrap"><table>
+<tr><th>Row</th><th>Evidence to capture</th><th>Mark met when</th></tr>
+<tr><td>Create Ticket</td><td>Screenshot of workflow run + ServiceNow ticket + incident note</td><td>Ticket created with correct fields, no duplicate on rerun</td></tr>
+<tr><td>Complete Containment</td><td>Pivot menu screenshot, approval, Falcon console showing contained host, lift result</td><td>Host isolated and restored through XDR, hash block recorded</td></tr>
+<tr><td>Create a Trigger</td><td>Rule configuration, notification received, worklog run entry</td><td>Fires automatically at the agreed score</td></tr>
+<tr><td>Create a Custom Playbook</td><td>Playbook definition and a completed incident walk-through</td><td>All tasks complete and the worklog is full</td></tr>
+</table></div>
+<p>Put the incident ids and run links into the sheet's <i>Notes</i> column, and change <i>Requirement Met?</i> only after the evidence exists.</p>
+</main>
+</body>
+</html>

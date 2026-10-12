@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cisco XDR POV Guide: HCL Tech sheet and workflow build</title>
+<style>
+:root{--bg:#f7f8fa;--fg:#1c2530;--mut:#5b6775;--ac:#0a5c8a;--card:#fff;--ln:#d9dee5;--code:#eef1f5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12171d;--fg:#e4e9ef;--mut:#9aa6b3;--ac:#5ab4e8;--card:#1a2129;--ln:#2d3743;--code:#222b35}}
+:root[data-theme="dark"]{--bg:#12171d;--fg:#e4e9ef;--mut:#9aa6b3;--ac:#5ab4e8;--card:#1a2129;--ln:#2d3743;--code:#222b35}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:24px 18px 60px}
+h1{font-size:1.9rem;line-height:1.2;margin:.2em 0}
+h2{font-size:1.4rem;margin:2.2em 0 .5em;padding-bottom:.25em;border-bottom:2px solid var(--ac)}
+h3{font-size:1.1rem;margin:1.6em 0 .4em;color:var(--ac)}
+p,li{max-width:75ch}
+.sub{color:var(--mut)}
+nav{display:flex;flex-wrap:wrap;gap:8px 16px;margin:16px 0;padding:12px;background:var(--card);border:1px solid var(--ln);border-radius:6px}
+a{color:var(--ac)}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:620px;background:var(--card);font-size:.93rem}
+th,td{border:1px solid var(--ln);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+td:first-child{font-weight:600;width:23%}
+pre{background:var(--code);padding:12px;border-radius:6px;overflow-x:auto;font-size:.85rem;line-height:1.45}
+code{background:var(--code);padding:1px 5px;border-radius:3px;font-size:.88em}
+pre code{padding:0;background:none}
+.note{border-left:4px solid var(--ac);background:var(--card);padding:8px 14px;margin:14px 0}
+ol.steps>li{margin:.6em 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Cisco XDR POV Guide</h1>
+<p class="sub">A plain-language walkthrough of the HCL Tech NDR/XDR requirements sheet, followed by a hands-on guide to building workflows in your own XDR tenant.</p>
+<nav>
+<a href="#key">1. How to read the sheet</a>
+<a href="#integ">2. Integration</a>
+<a href="#plat">3. Platform</a>
+<a href="#raw">4. Response / Automation</a>
+<a href="#im">5. Incident Management</a>
+<a href="#ai">6. AI</a>
+<a href="#build">7. Build guide</a>
+<a href="#api">8. API testing</a>
+<a href="#test">9. Test plan</a>
+</nav>
+<div class="note"><b>Note on menu names.</b> Cisco renames UI items between releases. Where this guide names a menu (for example Automate &gt; Workflows), treat it as the right neighborhood and confirm the exact label in your tenant. Where I am less sure of a detail I say so.</div>
+
+<h2 id="key">1. How to read the sheet</h2>
+<p>This is a <b>POV (Proof of Value)</b> checklist: a customer, HCL Tech, defines what Cisco XDR must demonstrate during a trial. Each row is one test. You fill in <i>Level of Importance</i> with the customer, then mark <i>Requirement Met?</i> and add notes after demonstrating it.</p>
+<div class="wrap"><table>
+<tr><th>Column</th><th>Meaning</th></tr>
+<tr><td>Category</td><td>Group the row belongs to: Integration, Platform, R.A.W, I.M, A.I.</td></tr>
+<tr><td>POV Functional Requirement</td><td>The capability being tested.</td></tr>
+<tr><td>Description</td><td>What exactly must be shown. The Description column sometimes carries a hint (for example "Pull CrowdStrike agent inputs").</td></tr>
+<tr><td>Level of Importance</td><td>0 = N/A in this environment, 1 = not important, 2 = nice to have, 3 = need to see, 4 = must see. Prioritize 4s and 3s.</td></tr>
+<tr><td>Requirement Met?</td><td>Pass or fail, filled after testing.</td></tr>
+<tr><td>Notes</td><td>Currently holds the owner names (for example Mohit Gupta, Vikas Jain), who are responsible for each integration on the customer side.</td></tr>
+<tr><td>Business Outcome</td><td>Why it matters. <b>DS</b> Detect Sooner, <b>PI</b> Prioritize by Impact, <b>SI</b> Speed up Investigation, <b>AR</b> Accelerate Response. Nearly every row maps to one or more; the goal of the POV is to prove these four outcomes.</td></tr>
+</table></div>
+
+<h2 id="integ">2. Integration</h2>
+<p>XDR is only as good as the data it receives. These rows connect data sources and enrichment so later detections have something to work with. All integration rows target all four outcomes (DS, PI, SI, AR).</p>
+<div class="wrap"><table>
+<tr><th>Requirement</th><th>What it means</th><th>How to demonstrate</th></tr>
+<tr><td>Endpoint: CrowdStrike via API</td><td>XDR connects to CrowdStrike with API credentials, so it can ingest detections and also run actions (isolate host, contain hash) from XDR.</td><td>Show CrowdStrike detections appearing in XDR incidents, then run a containment action on a test host.</td></tr>
+<tr><td>NVM</td><td>Network Visibility Module, part of Cisco Secure Client. It reports flow records from each endpoint including process name, hash, user and device. This is how "which process made this connection" is answered.</td><td>Deploy to a test laptop, generate traffic, show process-level connection data.</td></tr>
+<tr><td>NetFlow from IPS, firewalls, switches, routers</td><td>NetFlow summarizes who talked to whom (IPs, ports, bytes) without payloads. Network devices export it to a collector (typically Cisco Secure Network Analytics), which feeds XDR. It builds the behavior baseline and finds lateral movement.</td><td>Enable export on devices, confirm the collector sees flows, show an incident that uses them.</td></tr>
+<tr><td>SPAN from EPG</td><td>A SPAN (port mirror) copies actual packets from a critical application's Endpoint Group in Cisco ACI to a sensor, giving deeper visibility than NetFlow for the most important apps.</td><td>Mirror one critical app, show the extra detail in the sensor.</td></tr>
+<tr><td>ISE (NAC) for identity</td><td>Identity Services Engine knows which user and device owns an IP at a given time. Enrichment replaces "10.1.2.3" with "jsmith on laptop-42", which speeds investigation and enables the Abnormal User use case.</td><td>Show an incident where the asset or user is resolved through ISE.</td></tr>
+<tr><td>Public cloud: AWS, Azure, GCP</td><td>Collects cloud network telemetry, typically VPC or NSG flow logs and related audit data, so cloud workloads are covered like on-prem ones. Exact collection method depends on your licensing (I would verify which Cisco component is used in your tenant).</td><td>Connect one account or subscription per cloud, show events or alerts from it.</td></tr>
+<tr><td>Email: O365 via API</td><td>Connects Microsoft 365 for email and identity-related telemetry, plus potential response actions (for example, remove a message). Note that the Notes column has no owner yet.</td><td>Connect the tenant, show a mail-related detection or enrichment.</td></tr>
+</table></div>
+
+<h2 id="plat">3. Platform</h2>
+<p>These rows check what the XDR console itself can do once data is flowing: displaying, prioritizing and detecting.</p>
+<h3>Console and usability</h3>
+<div class="wrap"><table>
+<tr><th>Requirement</th><th>What it means</th></tr>
+<tr><td>Custom Dashboard</td><td>Build a dashboard from tiles (incident counts, top assets, trends) so the SOC sees what it cares about at a glance.</td></tr>
+<tr><td>Summary of an Incident</td><td>Each incident has a short and long description explaining what happened and why XDR grouped these events.</td></tr>
+<tr><td>Pivot the Node Graph</td><td>Incidents render as a graph of assets, users, IPs and files. Clicking a node opens a menu (the "pivot menu") of lookups and response actions. This is also where your pivot workflows appear.</td></tr>
+<tr><td>Display verdict of an observable</td><td>Show the reputation (clean, suspicious, malicious) of an IP, domain or hash from threat feeds such as Talos, VirusTotal and CINS Army.</td></tr>
+<tr><td>Customize Asset Value</td><td>Mark critical devices as high value. XDR weighs asset value when scoring, so an incident on a domain controller ranks above one on a lab PC. Directly serves Prioritize by Impact.</td></tr>
+<tr><td>Create limited user account</td><td>Show role-based access: create a user with restricted permissions (analyst, incident responder) instead of admin.</td></tr>
+<tr><td>MITRE ATT&amp;CK map overview</td><td>View which attacker techniques your tools cover and which are gaps, mapped to the MITRE ATT&amp;CK framework.</td></tr>
+<tr><td>Correlated Event</td><td>Show how XDR joins related events from different sources into one incident. The Description hint asks whether custom correlation rules exist; confirm in your tenant what is configurable.</td></tr>
+</table></div>
+<h3>Detection use cases</h3>
+<p>Each of these needs a test you can run to generate the alert. Your goal is to trigger the behavior safely in a lab and show the resulting incident.</p>
+<div class="wrap"><table>
+<tr><th>Requirement</th><th>What it detects</th><th>Suggested test</th></tr>
+<tr><td>Lateral Movement</td><td>An attacker or tool moving from machine to machine (server to server, client to server) using admin protocols such as SMB, RDP or WinRM.</td><td>From a test host, connect to several internal servers in a short period using an approved account.</td></tr>
+<tr><td>Behaviour Baseline</td><td>XDR learns normal NetFlow and SPAN patterns, then alerts when something deviates (new talker, traffic spike). Needs days of learning data, so start early.</td><td>Let the baseline build, then create unusual volume or a new destination.</td></tr>
+<tr><td>Abnormal User</td><td>A user acting unlike their normal pattern, detected by combining NVM and ISE identity.</td><td>Log in as a test user from an unusual device or at an unusual time.</td></tr>
+<tr><td>Malicious Process Detected</td><td>A running process whose hash matches a known malicious list. Hint: data comes from the CrowdStrike agent.</td><td>Use an <b>EICAR test file</b> or other safe test sample in the lab. Never real malware.</td></tr>
+<tr><td>Potential System Process Impersonation</td><td>A process named like a system process (for example svchost.exe) running from the wrong place. Hint: rename a file and execute it.</td><td>Copy a harmless executable, rename it to a system process name, run it.</td></tr>
+<tr><td>PowerShell RDP Connection</td><td>PowerShell making connections on the RDP port (3389), suggesting scripted remote access. Source: NVM or CrowdStrike.</td><td>Use PowerShell to open a TCP connection to port 3389 on a lab host.</td></tr>
+<tr><td>Connection to TOR IP</td><td>Traffic to the TOR network, often used for command-and-control or evasion.</td><td>In a lab, connect to a known TOR relay address.</td></tr>
+<tr><td>Port 8888 from multiple sources</td><td>Several devices sending files to one internal host on an unusual port, which can mean data staging or exfiltration.</td><td>Run a simple listener on 8888 and send small files from a few lab machines.</td></tr>
+</table></div>
+<p class="sub">Do these tests only in the customer-approved POV lab and tell their SOC beforehand so real alarms are not raised.</p>
+
+<h2 id="raw">4. Response / Automation / Workflow (R.A.W)</h2>
+<p>This is the focus of your work. All rows target Accelerate Response (AR).</p>
+<div class="wrap"><table>
+<tr><th>Requirement</th><th>What must be shown</th><th>XDR feature used</th></tr>
+<tr><td>Create Ticket (ServiceNow)</td><td>An incident automatically or manually creates a ticket in ServiceNow.</td><td>Workflow with a ServiceNow target and a REST call or atomic action.</td></tr>
+<tr><td>Complete Containment Workflow</td><td>Take a containment action: isolate an endpoint, block a domain or URL, or block a file hash.</td><td>Workflow using CrowdStrike (endpoint, hash) and, where available, a firewall or DNS integration (domain).</td></tr>
+<tr><td>Create a Trigger</td><td>A rule that fires when conditions are met, for example priority score over 800 sends an email. The sheet's "Priority Score ??" note means you should find out the scale; Cisco XDR scores incidents on a numeric scale I believe tops out at 1000, so verify in your tenant.</td><td>Automation rule (Automate &gt; Triggers) linked to a workflow.</td></tr>
+<tr><td>Create a Custom Playbook</td><td>Build a response playbook tailored to the customer's process.</td><td>Incident Response playbook whose tasks run workflows.</td></tr>
+</table></div>
+
+<h2 id="im">5. Incident Management (I.M)</h2>
+<div class="wrap"><table>
+<tr><th>Requirement</th><th>What it means</th></tr>
+<tr><td>Investigate Incident</td><td>Show how quickly an analyst can work an incident. The sheet's example filter: priority 500 or higher with a malicious observable. Demonstrate sorting and filtering the incident list, then opening one.</td></tr>
+<tr><td>Identify Patient Zero</td><td>Find the first affected host and trace how the attack spread, using the graph and timeline views.</td></tr>
+<tr><td>Investigate Observable</td><td>Look up any IP, domain or hash across the environment: verdicts, sightings, which devices touched it.</td></tr>
+<tr><td>Complete Incident Lifecycle to Closure</td><td>Work an incident through every step of the Cisco-provided (managed) incident playbook until it is closed. Shows the guided process: assess, contain, eradicate, recover, close.</td></tr>
+<tr><td>Review Incident Worklog</td><td>After closing, open the worklog and confirm every action and note was recorded. Your workflows should write to it so this passes.</td></tr>
+</table></div>
+
+<h2 id="ai">6. Artificial Intelligence (A.I)</h2>
+<div class="wrap"><table>
+<tr><th>Requirement</th><th>What it means</th></tr>
+<tr><td>AI assistant on an incident</td><td>Ask questions about an incident in natural language and get guided help. The sheet marks it Roadmap, so confirm availability in your tenant before promising it.</td></tr>
+<tr><td>AI incident summarization</td><td>Get an easy-to-read summary and timeline of an incident. Ties to Prioritize and Speed up Investigation.</td></tr>
+</table></div>
+
+<h2 id="build">7. Build guide: your first workflows</h2>
+<h3>Vocabulary</h3>
+<ul>
+<li><b>Workflow:</b> a visual flow of steps (activities) with logic. Maximum 500 per tenant.</li>
+<li><b>Atomic action:</b> one prebuilt step, such as one CrowdStrike call.</li>
+<li><b>Target:</b> a saved connection to a system (host, auth).</li>
+<li><b>Account key:</b> a stored credential used by a target. Never hard-code secrets in a workflow.</li>
+<li><b>Variable:</b> an input or output value; can be set as required, secure or local.</li>
+<li><b>Intent:</b> chosen at creation. Incident Response workflows can be used by playbook tasks or incident rules; observable-based workflows show up in pivot menus.</li>
+<li><b>Automation rule:</b> the trigger that runs a workflow on a condition, webhook or schedule.</li>
+</ul>
+
+<h3>Workflow A: create a ServiceNow ticket from an incident</h3>
+<ol class="steps">
+<li><b>Prepare ServiceNow.</b> Get a developer instance, or the customer's test instance, and a service account that can create records in the incident table.</li>
+<li><b>Create the account key and target.</b> In Automate, add an account key with the ServiceNow credentials, then a target pointing to <code>your-instance.service-now.com</code> using it (basic or OAuth, as your instance allows). If an out-of-the-box ServiceNow integration or exchange workflow exists, install it instead and learn from it.</li>
+<li><b>Create the workflow.</b> Automate &gt; Workflows &gt; New. Choose the <i>Incident Response</i> intent so it can receive an incident. Name it clearly, for example <code>SN - Create ticket from incident</code>.</li>
+<li><b>Add the inputs.</b> The incident context arrives through the workflow's incident input. Define the variables you need (title, priority, id, observables) if the intent does not supply them.</li>
+<li><b>Add the ServiceNow call.</b> Use an HTTP request activity (or the ServiceNow atomic action) with method POST to <code>/api/now/table/incident</code>. Body example:
+<pre><code>{
+  "short_description": "XDR: &lt;incident title&gt;",
+  "description": "Priority score: &lt;score&gt;\nXDR link: &lt;incident url&gt;",
+  "urgency": "1",
+  "caller_id": "xdr.service"
+}</code></pre></li>
+<li><b>Read the response.</b> Extract <code>result.number</code> (for example INC0010023) into a variable.</li>
+<li><b>Write back to XDR.</b> Add a step that adds a note or worklog entry to the incident with the ticket number, so the Worklog review passes.</li>
+<li><b>Add error handling.</b> On a non-2xx response, write a failure note to the incident rather than silently ending.</li>
+<li><b>Validate and run.</b> Use the validate option, then run against a test incident. Open the execution view to see each step's inputs and outputs, and fix mappings as needed.</li>
+<li><b>Check the Worklog</b> to confirm the run is listed with a link.</li>
+</ol>
+
+<h3>Workflow B: contain an endpoint (with approval)</h3>
+<ol class="steps">
+<li>Confirm the CrowdStrike integration is enabled (Administration &gt; Integrations); it should provide a target and atomic actions.</li>
+<li>Create a workflow with an <i>observable</i> intent for device or hostname type, so it appears in the node-graph pivot menu.</li>
+<li>First step: look up the host in CrowdStrike and get its device id. Stop with a clear message if not found.</li>
+<li>Add an <b>approval step</b> (email or in-console) asking an analyst to confirm. This is the "human in the loop" customers expect; if approval is declined, end and log it.</li>
+<li>Call the CrowdStrike contain (network isolate) action with that device id.</li>
+<li>Poll or check the host status, then write the outcome to the incident note.</li>
+<li>Create the matching reverse workflow (lift containment) so you can reset the lab host.</li>
+<li>Repeat the pattern for file-hash and domain blocking using the relevant integration actions.</li>
+</ol>
+
+<h3>Workflow C: trigger on high priority</h3>
+<ol class="steps">
+<li>Open Automate &gt; Triggers &gt; Automation Rules and create an incident rule.</li>
+<li>Set the condition on priority score (for example above 800) and, optionally, on a tactic or asset tag.</li>
+<li>Attach Workflow A (or an email-notification workflow). The workflow must be validated, or the rule will not run it.</li>
+<li>Generate a test incident above the threshold and confirm the workflow starts on its own.</li>
+<li><b>Webhook variant:</b> create a webhook trigger to get a URL, point an external tool at it (the Meraki example in Cisco's docs follows this pattern), and map the incoming payload to workflow variables.</li>
+</ol>
+
+<h3>Playbook: tie it together</h3>
+<ol class="steps">
+<li>Create a new playbook in the Automate area; give it rules for which incidents it applies to. If no playbook matches, the default one is used.</li>
+<li>Add phases and tasks, for example Triage (enrich observables), Contain (Workflow B), Notify (Workflow A), Close.</li>
+<li>For each task, choose to run a workflow or leave a manual step with instructions.</li>
+<li>Assign, test on an incident, and confirm each task completes and the worklog shows the activity.</li>
+</ol>
+
+<h2 id="api">8. API testing</h2>
+<p>Use API calls to test outside the UI, to script setup, and to inspect results. Create an API client under Administration &gt; API Clients (an administrator is needed).</p>
+<div class="wrap"><table>
+<tr><th>Service</th><th>US base URL</th></tr>
+<tr><td>Platform (Inspect, Enrich, Response)</td><td><code>https://visibility.amp.cisco.com/iroh/</code></td></tr>
+<tr><td>Private Intel (creating incidents)</td><td><code>https://private.intel.amp.cisco.com/ctia/</code></td></tr>
+<tr><td>Automation</td><td><code>https://automate.us.security.cisco.com/api/</code></td></tr>
+<tr><td>Incidents and Investigations</td><td><code>https://conure.us.security.cisco.com/v2/</code></td></tr>
+</table></div>
+<p>EU and APJC use region-specific hosts. The flow is always: request a token with client id and password, then send <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+<pre><code>import requests
+TOKEN_URL = "https://visibility.amp.cisco.com/iroh/oauth2/token"  # confirm on Cisco's Authentication page
+tok = requests.post(TOKEN_URL, auth=(CLIENT_ID, CLIENT_PW),
+                    data={"grant_type": "client_credentials"}).json()["access_token"]
+H = {"Authorization": f"Bearer {tok}"}
+
+# Search incidents
+r = requests.get("https://conure.us.security.cisco.com/v2/incident/search/count", headers=H)
+print(r.status_code, r.text)</code></pre>
+<p>A community MCP server for Cisco XDR also exists (listing, getting and updating incidents, and listing and running workflows), if you want to drive the tenant from an AI assistant. Treat it as unofficial and keep credentials in environment variables.</p>
+<p><b>Common problems:</b> 401 means an expired or wrong-region token; 403 means the API client lacks the scope; a workflow that never fires means the rule's workflow is not validated; a target that fails usually means a wrong account key or blocked network path.</p>
+
+<h2 id="test">9. Suggested POV test plan</h2>
+<ol class="steps">
+<li>Agree importance levels with the customer; focus on the 4s and 3s first.</li>
+<li>Get integrations working first (CrowdStrike, ISE, NVM, NetFlow), because detections depend on them.</li>
+<li>Start the behavior baseline early so it has learning time.</li>
+<li>Run the safe detection tests and record the incident for each.</li>
+<li>Build Workflows A, B and C, then the playbook.</li>
+<li>Walk one incident from detection to closure and review the worklog.</li>
+<li>Fill in <i>Requirement Met?</i> and <i>Notes</i> for every row with evidence (screenshot, incident id).</li>
+</ol>
+<p class="sub">Left out to keep this guide compact: per-integration setup screens, full API payloads for every endpoint, and CrowdStrike or ServiceNow-specific field lists. Ask for whichever you want next.</p>
+</main>
+</body>
+</html>
