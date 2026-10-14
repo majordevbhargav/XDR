@@ -1,0 +1,409 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>XDR Incident Lifecycle</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow reading column; each diagram sits in its own scrollable panel with a one-line claim above and a short note below. */
+:root{
+  --bg:#f3f6f8;
+  --surface:#ffffff;
+  --fg:#14232c;
+  --muted:#52656f;
+  --line:#d3dde3;
+  --accent:#0a7ea8;
+  --accent-soft:#e1f1f7;
+  --human:#9a5b00;
+  --human-soft:#fdf0d5;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f181e;--surface:#17232b;--fg:#e4edf1;--muted:#93a7b1;--line:#2b3b45;
+    --accent:#4cc0e8;--accent-soft:#16323e;--human:#f0b45a;--human-soft:#3a2d12;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f181e;--surface:#17232b;--fg:#e4edf1;--muted:#93a7b1;--line:#2b3b45;
+  --accent:#4cc0e8;--accent-soft:#16323e;--human:#f0b45a;--human-soft:#3a2d12;
+  color-scheme:dark;
+}
+body{
+  background:var(--bg);color:var(--fg);
+  font-family:var(--font-body);font-size:16px;line-height:1.6;
+  padding-block:28px 64px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+main{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+header{display:flex;flex-direction:column;gap:10px}
+h1{font-size:clamp(1.7rem,4.5vw,2.3rem);line-height:1.15;margin:0;font-weight:600;text-wrap:balance}
+h2{font-size:1.25rem;margin:0;font-weight:600;text-wrap:balance}
+p{margin:0;max-width:68ch}
+.lede{color:var(--muted);font-size:1.05rem}
+.tag{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+section{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel{
+  background:var(--surface);border:1px solid var(--line);border-radius:6px;
+  padding:16px;overflow-x:auto;min-width:0;
+}
+.panel pre.mermaid{margin:0;display:flex;justify-content:center;min-width:560px}
+.note{color:var(--muted);font-size:.93rem}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.88rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:14px;height:14px;border-radius:3px;display:inline-block;border:1.5px solid}
+.k-auto{background:#dff1f8;border-color:#0a7ea8}
+.k-guided{background:#e8e9fb;border-color:#5a5fd0}
+.k-human{background:#fdf0d5;border-color:#b7791f}
+.k-stop{background:#fbe3e1;border-color:#c0392b}
+.wrap{overflow-x:auto;min-width:0}
+table{border-collapse:collapse;width:100%;min-width:560px;background:var(--surface);font-size:.92rem}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--accent-soft);font-weight:600}
+td:first-child{font-weight:600;white-space:nowrap}
+code{font-family:var(--font-mono);font-size:.86em;background:var(--accent-soft);padding:1px 5px;border-radius:3px}
+.warn{border:1px solid var(--human);background:var(--human-soft);border-radius:6px;padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.warn b{color:var(--human)}
+</style>
+
+<main>
+<header>
+  <span class="tag">Cisco XDR · HCL proof of value</span>
+  <h1>XDR Incident Lifecycle</h1>
+  <p class="lede">One high-priority incident, two rules, and where the endpoint containment workflow sits. Endpoint tool assumed to be CrowdStrike, as in the build pack.</p>
+  <div class="legend" aria-label="Colour key">
+    <span><i class="k-auto"></i>Automation rule path (instant)</span>
+    <span><i class="k-guided"></i>Assignment rule and playbook path</span>
+    <span><i class="k-human"></i>Needs a person</span>
+    <span><i class="k-stop"></i>Stops or declined</span>
+  </div>
+</header>
+
+<section>
+  <h2>1. Whole lifecycle: creation to closure</h2>
+  <p>Both rules evaluate when the incident is created. The automation rule finishes in seconds. The assignment rule only attaches the playbook, and the analyst then works it to closure.</p>
+  <div class="panel">
+<pre class="mermaid">
+flowchart TD
+  INC(["Incident created<br/>priority score 800 or above"])
+  INC --> AR
+  INC --> AS
+
+  subgraph AUTO["AUTOMATION RULE: standalone, runs instantly"]
+    direction TB
+    AR["Rule condition met<br/>score 800+ and incident created"]
+    W1["Workflow: ServiceNow<br/>Create or Update Ticket"]
+    W2["Workflow: Webex<br/>post message to room"]
+    AR --> W1 --> W2
+  end
+
+  subgraph GUIDED["ASSIGNMENT RULE: attaches the playbook"]
+    direction TB
+    AS["Assignment rule matches<br/>same incidents"]
+    PB["Playbook attached:<br/>HCL - Standard Response"]
+    AS --> PB
+  end
+
+  W2 --> PING["Analyst sees Webex message<br/>and opens the incident"]
+  PB --> PING
+
+  PING --> P1
+
+  subgraph PLAY["PLAYBOOK: analyst works each phase"]
+    direction TB
+    P1["IDENTIFICATION<br/>review summary and assets<br/>check observable verdicts<br/>update ticket"]
+    P2["CONTAINMENT<br/>isolate host, block hash<br/>each with an approval step"]
+    P3["ERADICATION<br/>remove malware<br/>reset credentials"]
+    P4["RECOVERY<br/>lift containment<br/>update ticket<br/>close incident"]
+    P1 --> P2 --> P3 --> P4
+  end
+
+  P4 --> WL(["WORKLOG<br/>every task, approval and note recorded"])
+
+  classDef auto fill:#dff1f8,stroke:#0a7ea8,color:#0b2530,stroke-width:1.5px
+  classDef guided fill:#e8e9fb,stroke:#5a5fd0,color:#171a4a,stroke-width:1.5px
+  classDef human fill:#fdf0d5,stroke:#b7791f,color:#3a2a05,stroke-width:1.5px
+  classDef start fill:#14232c,stroke:#14232c,color:#ffffff
+  class AR,W1,W2 auto
+  class AS,PB guided
+  class PING,P1,P2,P3,P4 human
+  class INC,WL start
+</pre>
+  </div>
+  <p class="note">Ticket and Webex happen with no one clicking. Everything from Identification onward is a person making a call, with XDR running the workflows and keeping the record.</p>
+</section>
+
+<section>
+  <h2>2. Automation rule path in detail</h2>
+  <p>What the rule does, in order, and what it leaves alone.</p>
+  <div class="panel">
+<pre class="mermaid">
+flowchart LR
+  E(["Incident event"]) --> C{"Condition:<br/>score 800+<br/>and incident created?"}
+  C -- "no" --> X(["Rule does nothing"])
+  C -- "yes" --> V{"Workflows<br/>validated?"}
+  V -- "no" --> X2(["Rule cannot run them<br/>fix and validate first"])
+  V -- "yes" --> T1["1. ServiceNow<br/>Create or Update Ticket"]
+  T1 --> D{"Ticket already<br/>exists for incident?"}
+  D -- "no" --> N1["Create ticket<br/>status: Incident Reported"]
+  D -- "yes" --> U1["Update same ticket"]
+  N1 --> T2["2. Webex<br/>post message"]
+  U1 --> T2
+  T2 --> OUT(["Ticket exists<br/>Webex message posted<br/>no endpoint action taken"])
+
+  classDef auto fill:#dff1f8,stroke:#0a7ea8,color:#0b2530,stroke-width:1.5px
+  classDef stop fill:#fbe3e1,stroke:#c0392b,color:#4a1410,stroke-width:1.5px
+  classDef start fill:#14232c,stroke:#14232c,color:#ffffff
+  class C,V,T1,D,N1,U1,T2 auto
+  class X,X2 stop
+  class E,OUT start
+</pre>
+  </div>
+  <p class="note">Containment is not in this rule on purpose. A rule fires on a score and cannot wait for approval, so a false positive would isolate a host with nobody checking.</p>
+</section>
+
+<section>
+  <h2>3. Assignment rule and playbook path in detail</h2>
+  <p>The assignment rule runs once, at creation. After that the playbook is the analyst's checklist, and containment tasks start workflows with an approval gate.</p>
+  <div class="panel">
+<pre class="mermaid">
+flowchart TD
+  NEW(["New incident created"]) --> M{"Assignment rule<br/>matches?"}
+  M -- "no" --> DEF["Default playbook applies"]
+  M -- "yes" --> ATT["HCL - Standard Response attached"]
+  ATT --> I1
+
+  subgraph ID["IDENTIFICATION"]
+    direction TB
+    I1["Review incident summary<br/>and affected assets<br/>manual"]
+    I2["Check observable verdicts<br/>manual"]
+    I3["ServiceNow Create or Update<br/>automated, updates same ticket"]
+    I1 --> I2 --> I3
+  end
+
+  I3 --> Q{"Real threat?"}
+  Q -- "no, false positive" --> CL1["Document and close incident"]
+  Q -- "yes" --> C1
+
+  subgraph CO["CONTAINMENT"]
+    direction TB
+    C1["Isolate affected host<br/>runs CS - Isolate host"]
+    C2["Block malicious hash<br/>runs CS - Block file hash"]
+    C1 --> C2
+  end
+
+  C2 --> ER1
+
+  subgraph ER["ERADICATION"]
+    direction TB
+    ER1["Remove malware<br/>manual"]
+    ER2["Reset credentials<br/>manual"]
+    ER1 --> ER2
+  end
+
+  ER2 --> R1
+
+  subgraph RE["RECOVERY"]
+    direction TB
+    R1{"Host validated<br/>clean?"}
+    R2["Lift containment<br/>runs CS - Lift containment"]
+    R3["Update ticket<br/>document lessons<br/>close incident"]
+    R1 -- "yes" --> R2 --> R3
+  end
+
+  R1 -- "no" --> ER1
+  R3 --> WL(["Worklog complete"])
+  CL1 --> WL
+
+  classDef guided fill:#e8e9fb,stroke:#5a5fd0,color:#171a4a,stroke-width:1.5px
+  classDef human fill:#fdf0d5,stroke:#b7791f,color:#3a2a05,stroke-width:1.5px
+  classDef auto fill:#dff1f8,stroke:#0a7ea8,color:#0b2530,stroke-width:1.5px
+  classDef start fill:#14232c,stroke:#14232c,color:#ffffff
+  class M,ATT,DEF guided
+  class I1,I2,Q,ER1,ER2,R1,R3,CL1 human
+  class I3,C1,C2,R2 auto
+  class NEW,WL start
+</pre>
+  </div>
+  <p class="note">Blue boxes inside the playbook are workflows that XDR runs when the analyst starts the task. If recovery validation fails, the loop goes back to Eradication instead of lifting containment.</p>
+</section>
+
+<section>
+  <h2>4. Containment workflow: Isolate host</h2>
+  <p>This is the new part. The same workflow runs from the playbook task or from the pivot menu on a host in the incident graph.</p>
+  <div class="panel">
+<pre class="mermaid">
+flowchart TD
+  S(["Analyst runs CS - Isolate host<br/>input: hostname"]) --> F["Find device in CrowdStrike<br/>get device id"]
+  F --> FE{"Device found?"}
+  FE -- "no" --> N0["Add note: host not found"] --> END0(["End: failed"])
+  FE -- "yes" --> PL{"Hostname on<br/>protected list?<br/>domain controllers, core servers"}
+  PL -- "yes" --> AP2["Approval: senior role"]
+  PL -- "no" --> AP1["Approval: analyst or lead"]
+  AP1 --> AD{"Approved before<br/>timeout?"}
+  AP2 --> AD
+  AD -- "declined or timed out" --> N1["Add note: isolation not approved"] --> END1(["End: no action"])
+  AD -- "approved" --> ISO["POST contain action<br/>CrowdStrike network isolation"]
+  ISO --> W["Wait 30 to 60 seconds"]
+  W --> CHK{"Status is contained?"}
+  CHK -- "no, retries left" --> W
+  CHK -- "no, retries used up" --> N2["Add note: isolation not confirmed"] --> END2(["End: failed, escalate"])
+  CHK -- "yes" --> REC["Add note to incident:<br/>who approved, device id, result"]
+  REC --> OK(["End: host isolated<br/>worklog updated"])
+
+  classDef auto fill:#dff1f8,stroke:#0a7ea8,color:#0b2530,stroke-width:1.5px
+  classDef human fill:#fdf0d5,stroke:#b7791f,color:#3a2a05,stroke-width:1.5px
+  classDef stop fill:#fbe3e1,stroke:#c0392b,color:#4a1410,stroke-width:1.5px
+  classDef start fill:#14232c,stroke:#14232c,color:#ffffff
+  class F,FE,PL,ISO,W,CHK,REC auto
+  class AP1,AP2,AD human
+  class N0,N1,N2,END0,END1,END2 stop
+  class S,OK start
+</pre>
+  </div>
+  <p class="note">The hash block (<code>CS - Block file hash</code>) follows the same shape with a hash format check first. <code>CS - Lift containment</code> uses the same lookup and then the lift action, and is what resets your lab host after each test.</p>
+</section>
+
+<section>
+  <h2>5. Who does what, over time</h2>
+  <p>The sequence for one real incident, from the first alert to closure.</p>
+  <div class="panel">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant X as Cisco XDR
+  participant R as Automation rule
+  participant SN as ServiceNow
+  participant WX as Webex
+  participant A as Analyst
+  participant PB as Playbook
+  participant CS as CrowdStrike
+
+  X->>X: Incident created, score 800+
+  par Automation rule
+    X->>R: Rule condition met
+    R->>SN: Create or Update ticket
+    SN-->>R: Ticket number
+    R->>WX: Post incident message
+  and Assignment rule
+    X->>PB: Attach HCL - Standard Response
+  end
+  WX-->>A: Message with incident link
+  A->>PB: Identification tasks
+  PB->>SN: Update same ticket, no duplicate
+  A->>PB: Start Containment task
+  PB->>A: Approval request
+  A-->>PB: Approve
+  PB->>CS: Isolate host
+  CS-->>PB: Status contained
+  PB->>X: Worklog entry
+  A->>PB: Eradication tasks, manual
+  A->>PB: Start Recovery task
+  PB->>CS: Lift containment
+  A->>SN: Update ticket
+  A->>X: Close incident
+  X->>X: Worklog complete
+</pre>
+  </div>
+</section>
+
+<section>
+  <h2>Why the playbook is still needed</h2>
+  <div class="wrap">
+  <table>
+    <tr><th></th><th>Automation rule</th><th>Playbook</th></tr>
+    <tr><td>Runs</td><td>Instantly, once</td><td>Across the life of the incident</td></tr>
+    <tr><td>Decides</td><td>Only on a condition (score 800+)</td><td>The analyst, at each step</td></tr>
+    <tr><td>Manual work</td><td>Cannot hold any</td><td>Review, eradication, credential resets</td></tr>
+    <tr><td>Approvals</td><td>Cannot wait for one</td><td>Containment tasks sit behind them</td></tr>
+    <tr><td>Progress</td><td>Not tracked</td><td>Shows what is done and what is left</td></tr>
+    <tr><td>Evidence</td><td>Run history only</td><td>Worklog of tasks, approvals and notes</td></tr>
+    <tr><td>Sheet rows it covers</td><td>Create a Trigger</td><td>Custom Playbook, Lifecycle to Closure, Review Worklog, Complete Containment</td></tr>
+  </table>
+  </div>
+  <div class="warn">
+    <b>Two things to watch</b>
+    <p>Keep Webex in the rule or the playbook, not both, or the room gets two messages per incident. Assignment rules apply only when an incident is created, so test the full flow with a new incident.</p>
+  </div>
+</section>
+</main>
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+
+</body></html>
