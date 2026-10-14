@@ -1,110 +1,159 @@
-# XDR Security Automation Platform
+# Cisco XDR Security Automation Lab
 
-A hands-on Extended Detection and Response (XDR) project focused on connecting security telemetry, cloud services, incident management, and response automation in a single workflow.
+A practical Cisco XDR automation repository exploring incident response orchestration, AWS connectivity, ServiceNow ticket workflows, Webex notifications, and analyst-guided containment.
 
-> **Project status:** AWS integration and ServiceNow integration are implemented. Detection/automation playbooks and workflow rules are part of the project. EDR containment workflow is the remaining major item and is not yet complete.
+The repository combines implementation experiments with build notes, proof-of-value documentation, workflow diagrams, and a small Python example for the Cisco XDR Automation API.
 
-## Overview
+> **Status note:** AWS and ServiceNow integration work, automation rules, and playbooks are reported as completed in the project context. The EDR containment workflow is still the remaining major implementation milestone. This README does not claim that every documented flow has been tested end to end.
 
-Security teams often investigate alerts across separate tools. This project explores how integrations and repeatable playbooks can reduce manual handoffs, standardize triage, and make incident handling easier to follow.
+## What this project covers
 
-The repository is a learning and engineering project. Capabilities should be considered implemented only where the corresponding integration, configuration, and workflow are present and tested in this codebase.
+- **Cisco XDR Automation API:** a Python example for local IP-classification logic and optional workflow API operations.
+- **Incident lifecycle:** how an incident can trigger ticket updates, notifications, analyst investigation, and response tasks.
+- **ServiceNow:** incident creation/update patterns and avoiding duplicate tickets.
+- **AWS connectivity:** architecture and connectivity notes for integrating cloud signals and services.
+- **Playbooks and rules:** documented automation paths, human approval gates, and analyst handoffs.
+- **Containment design:** documented isolate, verify, and recovery concepts. Do not treat design diagrams as proof of a live EDR integration.
 
-## Current scope
+## Architecture at a glance
 
-- **AWS integration** — cloud-side integration work for the project.
-- **ServiceNow integration** — incident-management integration to support ticket and response workflows.
-- **Automation rules** — conditions and actions that route events through defined handling logic.
-- **Playbooks** — repeatable steps for common security-response scenarios.
-- **Workflow orchestration** — connecting integration events and response steps.
-- **Planned: EDR containment** — endpoint isolation/containment orchestration, including safe execution controls and outcome verification.
-
-## Response lifecycle
-
-```text
-Security signal / event
-        |
-        v
-Normalize and evaluate
-        |
-        v
-Automation rule matches?
-        |
-        +---- No ----> Log / leave for analyst review
-        |
-       Yes
-        |
-        v
-Run applicable playbook
-        |
-        +----> AWS integration actions
-        |
-        +----> ServiceNow incident workflow
-        |
-        v
-Record execution result and evidence
-        |
-        v
-Analyst review / follow-up
+```mermaid
+flowchart TD
+    A[Security event in Cisco XDR] --> B{Automation rule matches?}
+    B -- No --> C[Leave for analyst review]
+    B -- Yes --> D[Run configured automation]
+    D --> E[Create or update ServiceNow incident]
+    D --> F[Notify response channel]
+    B --> G[Assignment rule attaches playbook]
+    G --> H[Analyst investigates]
+    H --> I{Response approved?}
+    I -- No --> J[Document decision]
+    I -- Yes --> K[Run authorized response workflow]
+    K --> L[Verify result and update worklog]
+    L --> M[Recovery and incident closure]
 ```
 
-This diagram describes the intended high-level flow. Refer to the implementation and configuration in the repository for the exact event sources, conditions, and actions currently available.
+This is a logical overview based on the project documentation. Check the build guides and tenant configuration for the actual enabled rules, workflow names, API schemas, and integration status.
 
-## Security design principles
+## Repository map
 
-- **Least privilege:** use narrowly scoped credentials and roles for each integration.
-- **Secrets hygiene:** keep API keys, tokens, and account credentials out of source control.
-- **Auditable actions:** record which rule or playbook ran, its inputs, outcome, and errors, while avoiding unnecessary sensitive data.
-- **Human oversight:** require explicit approval for destructive or disruptive response actions until the safeguards are implemented and tested.
-- **Idempotency:** design retries so duplicate events do not create duplicate incidents or repeat risky actions.
-- **Failure handling:** distinguish successful, failed, skipped, and partially completed steps.
-- **Safe testing:** validate integrations in a sandbox or test tenant before using production systems.
+| Path | Purpose |
+| --- | --- |
+| `Automation/hello_xdr_api.py` | Python example for local IP classification and Cisco XDR Automation API calls |
+| `tests/test_hello_xdr_api.py` | Unit tests for local logic and the default workflow-start safety guard |
+| `AWS/` | AWS architecture, connectivity, and setup notes |
+| `XDR Docs/` | Cisco XDR API references, automation build guides, and incident lifecycle notes |
+| `HCL Docs/` | Proof-of-value reports and workflow diagrams |
+| `docs/ARCHITECTURE.md` | High-level architecture and reliability guidance |
+| `SECURITY.md` | Security policy and safe-response principles |
 
-## Configuration checklist
+## Quick start: Python example
 
-Before running the project, review the configuration and environment files in the repository and provide the required integration settings through environment variables or a local, untracked configuration file.
+Requires Python 3.10+ and network access only for API commands.
 
-- [ ] AWS identity/role and minimum required permissions
-- [ ] ServiceNow instance URL and scoped integration credentials
-- [ ] Event source and automation-rule configuration
-- [ ] Playbook-specific parameters
-- [ ] Logging and error handling
-- [ ] Test credentials and a non-production environment
+### 1. Create an environment
 
-Do not commit real credentials, access tokens, customer data, or production incident details.
+Windows PowerShell:
 
-## Validation checklist
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-Use this as a practical test plan when reviewing or extending the project:
+macOS/Linux:
 
-1. Verify each integration's authentication and permission scope.
-2. Test successful and failed API calls.
-3. Confirm that rules match expected events and ignore unrelated events.
-4. Confirm that playbooks record their execution status and useful diagnostic details.
-5. Test retries, duplicate events, rate limits, and timeouts.
-6. Verify that ServiceNow updates map to the intended incident fields and states.
-7. Confirm that no response action executes without the configured authorization checks.
-8. For future EDR containment, test authorization, endpoint targeting, rollback/release, and post-action verification in a lab environment.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-## Roadmap
+### 2. Run local tests
 
-- [x] AWS integration
-- [x] ServiceNow integration
-- [x] Automation rules and playbook workflows
-- [ ] EDR containment workflow
-- [ ] End-to-end integration tests with documented sample events
-- [ ] Execution audit trail and clearer failure/retry reporting
-- [ ] Architecture diagram reflecting the concrete implementation
-- [ ] Setup guide with exact prerequisites and safe test commands
+```bash
+python -m unittest discover -s tests -v
+python Automation/hello_xdr_api.py test
+```
 
-## Contributing
+These commands exercise local logic and do not need Cisco XDR credentials.
 
-1. Create a focused branch for your change.
-2. Keep credentials and environment-specific configuration out of commits.
-3. Add or update tests for rule and workflow changes.
-4. Document required configuration and expected behavior.
-5. Test against non-production services before proposing a merge.
+### 3. Configure API access
+
+Set these environment variables in your local shell or a private, untracked environment file:
+
+- `XDR_ID`: API client ID
+- `XDR_PW`: API client secret/password
+- `XDR_TOKEN_URL`: token URL copied from your Cisco XDR tenant's authentication settings
+- `XDR_REGION`: `us`, `eu`, or `apjc`, matching your tenant
+
+Example for the current PowerShell session:
+
+```powershell
+$env:XDR_ID = "your-client-id"
+$env:XDR_PW = "your-client-secret"
+$env:XDR_TOKEN_URL = "https://your-tenant-token-endpoint"
+$env:XDR_REGION = "apjc"
+```
+
+Do not paste real credentials into commits, screenshots, issues, or chat transcripts. Use a dedicated API client with the minimum required scopes.
+
+### 4. List workflows
+
+```bash
+python Automation/hello_xdr_api.py list
+```
+
+This makes an authenticated API request. It requires valid credentials and the correct token URL, region, and API scope.
+
+### 5. Starting a workflow is guarded
+
+The `run` command validates local input first. Actual workflow execution is disabled unless `XDR_ALLOW_WORKFLOW_START=true` is explicitly set.
+
+Before enabling it, verify the endpoint and request body against the current Automation OpenAPI specification for your tenant. The workflow-start payload in this example is illustrative and must not be assumed to match every tenant/API version.
+
+```powershell
+$env:XDR_ALLOW_WORKFLOW_START = "true"
+python Automation/hello_xdr_api.py run "Asha" 10.1.2.3
+```
+
+Only enable this in a test tenant after confirming the request schema and workflow behavior. A successful HTTP response alone does not prove that the workflow completed successfully.
+
+## Security and operational safeguards
+
+- Use least-privilege API clients and rotate credentials that may have been exposed.
+- Keep `.env` files, private keys, tokens, and customer data out of Git.
+- Validate event data before rule evaluation and response actions.
+- Make ticket creation/update idempotent to avoid duplicate incidents.
+- Apply bounded timeouts and retries; do not blindly retry non-idempotent actions.
+- Require explicit authorization and target validation before disruptive endpoint actions.
+- Record workflow IDs, decisions, timestamps, and outcomes without logging secrets.
+- Test against a sandbox or lab tenant before touching production systems.
+
+Read [SECURITY.md](SECURITY.md) before adding live response automation.
+
+## Project roadmap
+
+- [x] Document core incident lifecycle and AWS/XDR integration context
+- [x] Add a reproducible Python environment and local test suite
+- [x] Add safe defaults and input/configuration validation to the example API client
+- [x] Disable workflow start by default until the API request schema is verified
+- [ ] Verify API endpoints and request/response schemas against the tenant's current OpenAPI specification
+- [ ] Add mocked tests for token retrieval, workflow listing, API failures, and timeouts
+- [ ] Add end-to-end tests in a dedicated non-production tenant
+- [ ] Complete EDR containment with authorization, device verification, post-action checks, audit evidence, and recovery
+- [ ] Add a setup guide that maps every live integration to its exact configuration and required permissions
+
+## Further documentation
+
+- [Architecture and workflow notes](docs/ARCHITECTURE.md)
+- [Security policy](SECURITY.md)
+- [XDR incident lifecycle](XDR%20Docs/XDR%20Incident%20Lifecycle.md)
+- [AWS project notes](AWS/AWS%20Architecture%20Live%20Event%20Ticket%20Platform.md)
+- [HCL proof-of-value documentation](HCL%20Docs/)
 
 ## Disclaimer
 
-This project is for educational and defensive security engineering. Integrations and automated actions should be tested with least-privilege credentials in a controlled environment. Do not enable endpoint isolation or other disruptive response actions without authorization, safeguards, and a recovery procedure.
+This repository is an educational and defensive security engineering project. Use only systems and tenants you are authorized to access. Review all API scopes, playbook conditions, and approval gates before enabling automated actions. Endpoint isolation and other disruptive operations must have an approved recovery procedure.
