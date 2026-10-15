@@ -13,7 +13,7 @@ The repository combines implementation experiments with build notes, proof-of-va
 - **ServiceNow:** incident creation/update patterns and avoiding duplicate tickets.
 - **AWS connectivity:** architecture and connectivity notes for integrating cloud signals and services.
 - **Playbooks and rules:** documented automation paths, human approval gates, and analyst handoffs.
-- **Containment design:** documented isolate, verify, and recovery concepts. Do not treat design diagrams as proof of a live EDR integration.
+- **Containment design:** documented isolate, verify, and recovery concepts. Do not treat design diagrams as proof of a live EDR integration, used cisco endpoint containment for this workflow .
 
 ## Architecture at a glance
 
