@@ -1,5 +1,7 @@
 # Cisco XDR Security Automation Lab
 
+![XDR SECURITY AUTOMATION project banner](./assets/xdr-banner.svg)
+
 A practical Cisco XDR automation repository exploring incident response orchestration, AWS connectivity, ServiceNow ticket workflows, Webex notifications, and analyst-guided containment.
 
 The repository combines implementation experiments with build notes, proof-of-value documentation, workflow diagrams, and a small Python example for the Cisco XDR Automation API.
